@@ -43,7 +43,7 @@ public class SecurityUtils {
         }
     }
 
-    // 2. CODIFICACIÓN A TEXTO (Base64)
+    // 2. CODIFICACIÓN A TEXTO (Para poder enviar las claves en JSON por la red P2P)
     public static String encodeKey(Key key) {
         return Base64.getEncoder().encodeToString(key.getEncoded());
     }
@@ -211,7 +211,7 @@ public class WalletVerticle extends AbstractVerticle {
     }
 
     private void generateAndBroadcastTransaction() {
-        // 1. Crear TX firmada desde la Wallet
+        // 1. SOLUCIÓN AL TODO: Crear TX firmada desde la Wallet
         Transaction tx = myWallet.sendFunds("Bob", 10);
 
         System.out.println("💸 " + this.identity + " generando TX firmada: " + tx.getTransactionId().substring(0,8) + "...");
