@@ -1,9 +1,12 @@
 package es.us.dad.vertx.entities;
 
 import es.us.dad.vertx.utils.SecurityUtils;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
 import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Transaction {
 
@@ -18,6 +21,22 @@ public class Transaction {
     // De momento puede ir vacío o null.
     private String signature;
 
+    // -- Campos nuevos del modulo 9 ------
+    private long fee;
+
+    /*
+        Outputs UTXO generados (Punto 6)
+        output[0] -> cantidad al receptor
+        output[1] -> "change" de vuelta al emisor
+     */
+    private List<TransactionOutput> outputs = new ArrayList<>();
+
+    /*
+        Inputs UTXO consumidos (Punto 6)
+        Cada input referencia un al transactionId de una TX anterior y su outputIndex.
+     */
+    private List<TransactionInput> inputs = new ArrayList<>();
+
     // 2. CONSTRUCTORES
 
     // Constructor vacío: OBLIGATORIO para que Vert.x pueda reconstruir el objeto desde JSON
@@ -31,6 +50,7 @@ public class Transaction {
         this.amount = tx.getLong("amount");
         this.timestamp = tx.getLong("timestamp");
         this.signature = tx.getString("signature");
+        this.fee = tx.getLong("fee");
     }
 
     // Constructor para crear una nueva transacción
@@ -39,6 +59,21 @@ public class Transaction {
         this.receiver = receiver;
         this.amount = amount;
         this.timestamp = System.currentTimeMillis();
+        this.outputs = new ArrayList<>();
+        this.inputs = new ArrayList<>();
+        // Calculamos el ID inmediatamente al crearla
+        this.transactionId = calculateHash();
+    }
+
+    // Constructor con fee explícito - usado por TransactionBuilder (Punto 4).
+    public Transaction(String sender, String receiver, long amount,long fee) {
+        this.sender = sender;
+        this.receiver = receiver;
+        this.amount = amount;
+        this.fee = fee;
+        this.timestamp = System.currentTimeMillis();
+        this.outputs = new ArrayList<>();
+        this.inputs = new ArrayList<>();
         // Calculamos el ID inmediatamente al crearla
         this.transactionId = calculateHash();
     }
@@ -84,12 +119,35 @@ public class Transaction {
                 .put("sender", this.sender)
                 .put("receiver", this.receiver)
                 .put("amount", this.amount)
+                .put("fee", this.fee)
                 .put("timestamp", this.timestamp);
 
         // Si tienes firma, añádela también
         if (this.signature != null) {
             json.put("signature", this.signature);
         }
+
+        // Serializar outputs UTXO
+        JsonArray outputsArray = new JsonArray();
+        for (TransactionOutput out : outputs) {
+            outputsArray.add(new JsonObject()
+                    .put("address", out.getRecipientAddress())
+                    .put("amount",  out.getAmount())
+                    .put("spent",   out.isSpent())
+            );
+        }
+        json.put("outputs", outputsArray);
+
+        // Serializar inputs UTXO
+        JsonArray inputsArray = new JsonArray();
+        for (TransactionInput in : inputs) {
+            inputsArray.add(new JsonObject()
+                    .put("previousTxId",    in.getPreviousTransactionId())
+                    .put("outputIndex",     in.getOutputIndex())
+                    .put("unlockingScript", in.getUnlockingScript())
+            );
+        }
+        json.put("inputs", inputsArray);
 
         return json;
     }
@@ -123,8 +181,27 @@ public class Transaction {
     public String getSignature() { return signature; }
     public void setSignature(String signature) { this.signature = signature; }
 
+    /** Comisión para el minero (Punto 4) */
+    public long getFee()           { return fee;  }
+    public void setFee(long fee)   { this.fee = fee; }
+
+    /** Outputs UTXO generados (Punto 6) */
+    public List<TransactionOutput> getOutputs() {
+        return outputs;
+    }
+    /** Solo para uso interno por TransactionBuilder */
+    public void setOutputs(List<TransactionOutput> outputs) { this.outputs = new ArrayList<>(outputs); }
+
+    /** Inputs UTXO consumidos (Punto 6) */
+    public List<TransactionInput> getInputs() {
+        return inputs;
+    }
+
+    /** Solo para uso interno por TransactionBuilder */
+    public void setInputs(List<TransactionInput> inputs) { this.inputs = new ArrayList<>(inputs); }
+
     @Override
     public String toString() {
-        return String.format("[%s] %s -> %s : %d BTC", transactionId, sender, receiver, amount);
+        return String.format("[%s] %s -> %s : %d BTC (fee = %d)", transactionId, sender, receiver, amount,fee);
     }
 }
