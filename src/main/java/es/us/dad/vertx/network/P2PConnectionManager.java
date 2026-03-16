@@ -2,6 +2,7 @@ package es.us.dad.vertx.network;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.*;
 import io.vertx.core.parsetools.RecordParser;
@@ -29,18 +30,8 @@ public class P2PConnectionManager extends AbstractVerticle {
 
     @Override
     public void start(Promise<Void> startPromise) {
-        // 1. Configuración: Leer puerto y semilla
-        this.listenPort = config().getInteger("p2p.port", 6000);
-        String seed = config().getString("p2p.seed.ip", ""); // Ej: "localhost:6000"
-
-        // 2. Levantar Servidor (Escucha conexiones entrantes)
-        startServer();
-
-        // 3. Conectar a Semilla (Si existe en config)
-        if (!seed.isEmpty()) {
-            connectToPeer(seed);
-        }
-
+        // Levantar Servidor (Escucha conexiones entrantes)
+        initServer(6000);
         // 4. CONSUMIDORES DEL EVENTBUS (Comunicación Interna -> Externa)
 
         // A. Peticiones genéricas de difusión (ej: Wallet manda TX ya formateada)
@@ -53,17 +44,20 @@ public class P2PConnectionManager extends AbstractVerticle {
         vertx.eventBus().consumer(BusAddresses.MINED_BLOCK, msg -> {
             JsonObject blockJson = (JsonObject) msg.body();
 
+            //TODO 3:  Estandarizar sobre JSON de red
+
             // Construimos el mensaje de protocolo P2P
             JsonObject p2pMsg = new JsonObject()
                     .put("type", "BLOCK")
                     // Asumimos que el bloque tiene un hash calculado
-                    .put("hash", blockJson.getString("hash"))
-                    .put("data", blockJson);
+                    .put("payload", blockJson);
 
-            System.out.println("📢 Minero local encontró bloque " + p2pMsg.getString("hash").substring(0, 6) + "... Difundiendo.");
+            System.out.println("📢 Minero local encontró bloque " +
+                    p2pMsg.getJsonObject("payload").getString("hash").substring(0, 6) +
+                    "... Difundiendo.");
 
             // Lo marcamos como visto para no re-procesarlo si nos vuelve
-            seenMessagesCache.add(p2pMsg.getString("hash"));
+            seenMessagesCache.add(p2pMsg.getJsonObject("payload").getString("hash"));
 
             broadcastMessage(p2pMsg);
         });
@@ -73,7 +67,18 @@ public class P2PConnectionManager extends AbstractVerticle {
     }
 
     // --- LÓGICA DE SERVIDOR ---
-    private void startServer() {
+    // TODO 1: Extraer lógica de inicialización de server
+    private void initServer(int port) {
+
+        // 1. Configuración: Leer puerto y semilla//
+        this.listenPort = config().getInteger("p2p.port", port);
+        String host = config().getString("p2p.seed", "");
+
+        // 2. Conectar a Semilla (Si existe en config)
+        if (!host.isEmpty()) {
+            connectToPeer(host, port, new HashMap<>());
+        }
+
         NetServerOptions options = new NetServerOptions()
                 .setTcpKeepAlive(true);
         NetServer server = vertx.createNetServer(options);
@@ -93,16 +98,21 @@ public class P2PConnectionManager extends AbstractVerticle {
     }
 
     // --- LÓGICA DE CLIENTE (BOOTSTRAPPING) ---
-    private void connectToPeer(String address) {
-        String[] parts = address.split(":");
-        String host = parts[0];
-        int port = Integer.parseInt(parts[1]);
+    // TODO 2: Extraer lógica de cliente
+    private void connectToPeer(String host, int port, Map<String, Integer> intentosConexion) {
+        String address = host + ":" + port;
+        int intentosMaximos = 5;
 
         NetClientOptions options = new NetClientOptions().setTcpKeepAlive(true);
         NetClient client = vertx.createNetClient(options);
 
 
+        if(!intentosConexion.containsKey(address)){
+            intentosConexion.put(address, 0);
+        }
+
         System.out.println("🔌 Intentando conectar a semilla: " + address);
+        System.out.println("Intento nº " + intentosConexion.get(address));
 
         client.connect(port, host).onComplete(res -> {
             if (res.succeeded()) {
@@ -113,7 +123,13 @@ public class P2PConnectionManager extends AbstractVerticle {
                 // Enviar Handshake inicial al conectar
                 sendHandshake(socket);
             } else {
-                System.err.println("❌ No se pudo conectar a " + address);
+                System.err.println("❌ No se pudo conectar a " + address + ", intentándolo de nuevo");
+                if (intentosConexion.get(address) <= 5) {
+                    intentosConexion.put(address, intentosConexion.get(address) + 1);
+                    connectToPeer(host, port, intentosConexion);
+                } else {
+                    connectToPeer(host, port + 1, intentosConexion);
+                }
             }
         });
     }
@@ -128,10 +144,11 @@ public class P2PConnectionManager extends AbstractVerticle {
             activeSockets.remove(socket);
             System.out.println("❌ Conexión cerrada con " + socket.remoteAddress());
             // Reconexión solo si somos el cliente (tenemos semilla configurada)
-            String seed = config().getString("p2p.seed.ip", "");
-            if (!seed.isEmpty()) {
+            int port = config().getInteger("p2p.port", 6000);
+            String host = config().getString("p2p.host", "");
+            if (!host.isEmpty()) {
                 System.out.println("🔄 Reconectando en 3 segundos...");
-                vertx.setTimer(3000, id -> connectToPeer(seed));
+                vertx.setTimer(3000, id -> connectToPeer(host, port, new HashMap<>()));
             }
         });
 
