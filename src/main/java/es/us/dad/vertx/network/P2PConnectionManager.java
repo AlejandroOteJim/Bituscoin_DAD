@@ -12,6 +12,7 @@ import io.vertx.core.Promise;
 public class P2PConnectionManager extends AbstractVerticle {
 
     private int listenPort;
+    private Map<String, Integer> intentosConexion;
     // Lista de sockets activos (nuestros "vecinos")
     private final List<NetSocket> activeSockets = new ArrayList<>();
 
@@ -28,10 +29,12 @@ public class P2PConnectionManager extends AbstractVerticle {
             }
     );
 
+
+
     @Override
     public void start(Promise<Void> startPromise) {
         // Levantar Servidor (Escucha conexiones entrantes)
-        initServer(6000);
+        initServer();
         // 4. CONSUMIDORES DEL EVENTBUS (Comunicación Interna -> Externa)
 
         // A. Peticiones genéricas de difusión (ej: Wallet manda TX ya formateada)
@@ -68,15 +71,15 @@ public class P2PConnectionManager extends AbstractVerticle {
 
     // --- LÓGICA DE SERVIDOR ---
     // TODO 1: Extraer lógica de inicialización de server
-    private void initServer(int port) {
+    private void initServer() {
 
         // 1. Configuración: Leer puerto y semilla//
-        this.listenPort = config().getInteger("p2p.port", port);
+        this.listenPort = config().getInteger("p2p.port", 6000);
         String host = config().getString("p2p.seed", "");
-
+        intentosConexion = new HashMap<>();
         // 2. Conectar a Semilla (Si existe en config)
         if (!host.isEmpty()) {
-            connectToPeer(host, port, new HashMap<>());
+            connectToPeer(host, listenPort);
         }
 
         NetServerOptions options = new NetServerOptions()
@@ -99,7 +102,7 @@ public class P2PConnectionManager extends AbstractVerticle {
 
     // --- LÓGICA DE CLIENTE (BOOTSTRAPPING) ---
     // TODO 2: Extraer lógica de cliente
-    private void connectToPeer(String host, int port, Map<String, Integer> intentosConexion) {
+    private void connectToPeer(String host, int port) {
         String address = host + ":" + port;
         int intentosMaximos = 5;
 
@@ -126,9 +129,9 @@ public class P2PConnectionManager extends AbstractVerticle {
                 System.err.println("❌ No se pudo conectar a " + address + ", intentándolo de nuevo");
                 if (intentosConexion.get(address) <= 5) {
                     intentosConexion.put(address, intentosConexion.get(address) + 1);
-                    connectToPeer(host, port, intentosConexion);
+                    connectToPeer(host, port);
                 } else {
-                    connectToPeer(host, port + 1, intentosConexion);
+                    connectToPeer(host, port + 1);
                 }
             }
         });
@@ -148,7 +151,7 @@ public class P2PConnectionManager extends AbstractVerticle {
             String host = config().getString("p2p.host", "");
             if (!host.isEmpty()) {
                 System.out.println("🔄 Reconectando en 3 segundos...");
-                vertx.setTimer(3000, id -> connectToPeer(host, port, new HashMap<>()));
+                vertx.setTimer(3000, id -> connectToPeer(host, port));
             }
         });
 
@@ -193,7 +196,7 @@ public class P2PConnectionManager extends AbstractVerticle {
                 vertx.cancelTimer(id);
                 return;
             }
-            JsonObject ping = new JsonObject().put("type", "PING");
+            JsonObject ping = new JsonObject().put("type", "payload");
             Buffer payload = Buffer.buffer(ping.encode());
             Buffer frame = Buffer.buffer().appendInt(payload.length()).appendBuffer(payload);
             if (!socket.writeQueueFull()) {
@@ -241,11 +244,13 @@ public class P2PConnectionManager extends AbstractVerticle {
             // 4. REENVIAR A VECINOS (Flood)
             // Reenviamos a todos menos al que me lo envió (mejora de eficiencia)
             broadcastMessageExcept(msg, originSocket);
-
-        } catch (Exception e) {
+        } catch(Exception e){
+            // CERRAR SOCKET AQUI
             System.err.println("⚠️ Payload corrupto: " + e.getMessage());
+            originSocket.close();
         }
     }
+
 
     // --- DIFUSIÓN (WRITE WITH FRAMING) ---
 
