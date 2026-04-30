@@ -1,7 +1,7 @@
 package es.us.dad.vertx;
 
 import es.us.dad.vertx.miner.MinerVerticle;
-import es.us.dad.vertx.network.P2PConnectionManager;
+import es.us.dad.vertx.network.PeerManager;
 import es.us.dad.vertx.wallet.WalletVerticle;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
@@ -15,7 +15,7 @@ public class MainVerticle extends AbstractVerticle {
     public void start(Promise<Void> startPromise) {
         DeploymentOptions options = new DeploymentOptions().setConfig(config());
 
-        Future<String> p2pDeploy = vertx.deployVerticle(new P2PConnectionManager(), options);
+        Future<String> p2pDeploy = vertx.deployVerticle(new PeerManager(), options);
         Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(), options);
         Future<String> walletDeploy = vertx.deployVerticle(new WalletVerticle(), options);
 
