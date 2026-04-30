@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Node 2 - Peer" type="Application" factoryName="Application" singleton="false">
+    <option name="MAIN_CLASS_NAME" value="es.us.dad.vertx.BituscoinLauncher" />
+    <module name="VertxIntro" />
+    <option name="PROGRAM_PARAMETERS" value="conf/node2.json" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="es.us.dad.vertx.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
