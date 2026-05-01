@@ -3,6 +3,8 @@ package es.us.dad.vertx.entities;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.vertx.core.Vertx;
+
 public class BlockChain {
 
     // CAMBIO 1: La cadena almacena BLOQUES completos (Header + Body), no solo cabeceras.
@@ -14,11 +16,31 @@ public class BlockChain {
     // Versión actual del software Bituscoin
     public static final int VERSION = 1;
 
+    // APARTADO 2
+    // Dirección donde guardaremos el estado en formato json
+    private static final String STORAGE_PATH = "data/blockchain.json";
 
-    public BlockChain() {
+    // APARTADO 2
+    // Motor de Vert.x necesario para acceder al FileSystem de forma asíncrona.
+    // Se usa 'transient' para evitar que el serializador intente convertir el motor entero de Vert.x a JSON, lo cual causaría un error fatal.
+    private transient Vertx vertx;
+
+    public BlockChain() { // nos llama al constructor el miner
+        // APARTADO 2
+        // Ajustamos el constructor para tener en cuenta el Vertx, la API que nos da acceso al fileSystem
+        this.vertx = Vertx.vertx(); // mirar si aquí estás creando una instancia nueva o mirando la que ya tenemos
         this.chain = new ArrayList<>();
         // Creamos el Génesis
         chain.add(createGenesisBlock());
+        // APARTADO 2
+        // Comprobación inicial de seguridad durante el arranque del nodo.
+        // Se usa la versión síncrona (Blocking) excepcionalmente aquí porque estamos en el constructor
+        // y necesitamos garantizar que la carpeta "data" existe antes de aceptar bloques.
+        if (!this.vertx.fileSystem().existsBlocking("data")) { // te bloquea el worker verticle del miner
+            this.vertx.fileSystem().mkdirsBlocking("data"); // mira si existe y sino la crea
+        }
+
+        // mirar qué te pasaría si no tienes eso
     }
 
     // 1. OBTENER ÚLTIMO BLOQUE
@@ -31,8 +53,11 @@ public class BlockChain {
     public void addBlock(Block newBlock) {
         Block previousBlock = getLatestBlock();
 
+        // tenemos que hacer un if para saber si meterlo o no?? ver validateblock
+
+        /*
         // CASO ESPECIAL: Si es el primer bloque tras el Génesis
-        if (previousBlock != null) {
+        if (previousBlock != null) { // si el anterior no es el génesis??
 
             // 1. VALIDAR ENLACE (Continuidad)
             // El bloque nuevo YA debe traer puesto el hash del anterior.
@@ -65,7 +90,7 @@ public class BlockChain {
         // b) ¿El hash realmente empieza por esos ceros?
         if (!newBlock.getHash().startsWith(target)) {
             throw new RuntimeException("❌ Rechazado: El hash no cumple la prueba de trabajo (No minado)");
-        }
+        }  DICE QUE HAY QUE QUITARLO   -------------------------------------- */
 
         // SI TODO ESTÁ BIEN, LO AÑADIMOS
         System.out.println("✅ Bloque #" + newBlock.getHeader().getIndex() + " añadido a la cadena.");
@@ -96,6 +121,9 @@ public class BlockChain {
         // ❌ MAL: Esto crea un hash distinto cada vez que arrancas el programa
         // long timestamp = System.currentTimeMillis();
         // String data = "Genesis " + UUID.randomUUID();
+        // Para poder validar que el Bloque 1 es real, necesitas el Hash del Bloque 0.
+        // Si el nodo te da un Bloque 0 falso, podrá darte un Bloque 1 falso, un Bloque 2 falso...
+        // El génesis tiene que estar predefinido (hardcoded)
 
         // ✅ BIEN: Valores FIJOS (Hardcoded)
         // Usamos una fecha congelada en el tiempo
@@ -131,9 +159,10 @@ public class BlockChain {
     }
 
     // Pequeño helper para que el Génesis nazca válido
+    // ver que el hash del genesis empiece por el número de 0 que diga su dificultad
     private static void mineGenesis(Block block, int difficulty) {
         String target = new String(new char[difficulty]).replace('\0', '0');
-        while(!block.calculateHash().startsWith(target)) {
+        while (!block.calculateHash().startsWith(target)) {
             block.getHeader().setNonce(block.getHeader().getNonce() + 1);
         }
     }
@@ -158,6 +187,8 @@ public class BlockChain {
 
             // 3. (NUEVO) VERIFICACIÓN DE LA PRUEBA DE TRABAJO (PoW)
             // Obtenemos la dificultad que DICE tener el bloque
+            // esto lo dejamos porque sí que tenemos que validar la blockchain como tal,
+            // lo que no tenemos que hacer es la validación al añadir el bloque
             int difficulty = current.getHeader().getDifficulty();
 
             // Creamos el string de ceros (ej: "0000")
