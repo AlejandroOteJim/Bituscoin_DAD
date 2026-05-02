@@ -50,7 +50,35 @@ public class Transaction {
         this.amount = tx.getLong("amount");
         this.timestamp = tx.getLong("timestamp");
         this.signature = tx.getString("signature");
-        this.fee = tx.getLong("fee");
+        this.fee = tx.getLong("fee", 0L);
+
+        // Reconstruir inputs UTXO desde JSON (si existen)
+        this.inputs = new ArrayList<>();
+        JsonArray inputsArray = tx.getJsonArray("inputs");
+        if (inputsArray != null) {
+            for (int i = 0; i < inputsArray.size(); i++) {
+                JsonObject inputJson = inputsArray.getJsonObject(i);
+                inputs.add(new TransactionInput(
+                    inputJson.getString("previousTxId"),
+                    inputJson.getInteger("outputIndex"),
+                    inputJson.getString("unlockingScript")
+                ));
+            }
+        }
+
+        // Reconstruir outputs UTXO desde JSON (si existen)
+        this.outputs = new ArrayList<>();
+        JsonArray outputsArray = tx.getJsonArray("outputs");
+        if (outputsArray != null) {
+            for (int i = 0; i < outputsArray.size(); i++) {
+                JsonObject outputJson = outputsArray.getJsonObject(i);
+                outputs.add(new TransactionOutput(
+                    outputJson.getString("address"),
+                    outputJson.getLong("amount"),
+                    outputJson.getBoolean("spent", false)
+                ));
+            }
+        }
     }
 
     // Constructor para crear una nueva transacción
@@ -82,11 +110,29 @@ public class Transaction {
 
     /**
      * Calcula el Hash de la transacción basándose en sus datos.
-     * Si alguien cambia 1 céntimo (amount), el ID cambia totalmente.
+     * Módulo 9, Punto 3: El hash incluye fee e información UTXO para garantizar integridad completa.
+     * Si alguien cambia 1 céntimo (amount, fee, o inputs/outputs), el ID cambia totalmente.
      */
     public String calculateHash() {
-        String dataToHash = sender + receiver + Long.toString(amount) + Long.toString(timestamp);
-        return applySha256(dataToHash);
+        StringBuilder sb = new StringBuilder();
+        sb.append(sender).append(receiver)
+          .append(Long.toString(amount))
+          .append(Long.toString(fee))
+          .append(Long.toString(timestamp));
+
+        // Incluir inputs en el hash para anti-doble-gasto
+        for (TransactionInput input : inputs) {
+            sb.append(input.getPreviousTransactionId())
+              .append(input.getOutputIndex());
+        }
+
+        // Incluir outputs en el hash para integridad UTXO
+        for (TransactionOutput output : outputs) {
+            sb.append(output.getRecipientAddress())
+              .append(output.getAmount());
+        }
+
+        return applySha256(sb.toString());
     }
 
     // SOLUCIÓN: Método de validación criptográfica
@@ -152,10 +198,20 @@ public class Transaction {
         return json;
     }
 
+    /**
+     * Módulo 9, Punto 7: Serialización estandarizada para red (EventBus/P2P).
+     * Encapsula el formato exacto que el Módulo 6 (Minería) espera recibir.
+     * @return JsonObject listo para publicar en EventBus o red P2P
+     */
+    public JsonObject toNetworkJson() {
+        // Usa el mismo formato que toJson() - es la representación estándar de red
+        return toJson();
+    }
+
     // Helper estático para SHA-256 (Puedes moverlo a una clase StringUtil si prefieres)
     public static String applySha256(String input) {
         try {
-             return SHA256.applySha256(input);
+            return SHA256.applySha256(input);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

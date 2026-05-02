@@ -1,13 +1,11 @@
 package es.us.dad.vertx.wallet;
 
-import com.hazelcast.scheduledexecutor.impl.operations.SyncStateOperation;
 import es.us.dad.vertx.entities.Transaction;
 import es.us.dad.vertx.entities.TransactionInput;
 import es.us.dad.vertx.entities.TransactionOutput;
 import es.us.dad.vertx.network.BusAddresses;
 import es.us.dad.vertx.utils.SecurityUtils;
 
-import javax.naming.InsufficientResourcesException;
 import java.security.PrivateKey;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -38,12 +36,12 @@ public class TransactionBuilder {
 
     private static class PendingInput {
         final String prevTxId;
-        final int uotputIndex;
+        final int outputIndex;
         final long utxoValue;
 
-        PendingInput (String prevTxId, int uotputIndex, long utxoValue) {
+        PendingInput (String prevTxId, int outputIndex, long utxoValue) {
             this.prevTxId = prevTxId;
-            this.uotputIndex = uotputIndex;
+            this.outputIndex = outputIndex;
             this.utxoValue = utxoValue;
         }
     }
@@ -73,21 +71,21 @@ public class TransactionBuilder {
     }
 
     public TransactionBuilder fee(long fee){
-        if(fee <= 0){
-            throw new IllegalArgumentException("[TransactionBuilder] fee() debe ser un valor positivo y no cero. Recibida: " + fee);
+        if(fee < 0){
+            throw new IllegalArgumentException("[TransactionBuilder] fee() debe ser un valor no negativo. Recibida: " + fee);
         }
         this.fee = fee;
         return this;
     }
 
-    public TransactionBuilder withInputs(String prevTxId, int uotputIndex, long utxoValue){
+    public TransactionBuilder withInputs(String prevTxId, int outputIndex, long utxoValue){
         if(prevTxId == null || prevTxId.isBlank()){
             throw new IllegalArgumentException("[TransactionBuilder] withInputs() prevTxId no puede ser nulo o estar vacío");
         }
-        if(uotputIndex <= 0){
-            throw new IllegalArgumentException("[TransactionBuilder] withInputs() uotputIndex debe ser un valor positivo. Recibida: " + uotputIndex);
+        if(outputIndex < 0){
+            throw new IllegalArgumentException("[TransactionBuilder] withInputs() outputIndex debe ser >= 0. Recibida: " + outputIndex);
         }
-        pendingInputs.add(new PendingInput(prevTxId, uotputIndex, utxoValue));
+        pendingInputs.add(new PendingInput(prevTxId, outputIndex, utxoValue));
         return this;
     }
 
@@ -112,7 +110,7 @@ public class TransactionBuilder {
      */
 
     public Transaction build(PrivateKey privateKey){
-         // -- 1. Validación preventiva de campos (Punto 5) -----------------
+        // -- 1. Validación preventiva de campos (Punto 5) -----------------
         assertAllFieldsValid();
 
         // -- 2. Verificar fondos si hay inputs UTXO ---------------
@@ -151,7 +149,7 @@ public class TransactionBuilder {
         // -- 6. Construir inputs UTXO (el unlockingScript es la firma ECDSA) --
         List<TransactionInput> txInputs = new ArrayList<>();
         for(PendingInput pendingInput : pendingInputs){
-            txInputs.add(new TransactionInput(pendingInput.prevTxId, pendingInput.uotputIndex, signatureB64));
+            txInputs.add(new TransactionInput(pendingInput.prevTxId, pendingInput.outputIndex, signatureB64));
         }
         tx.setInputs(txInputs);
 
