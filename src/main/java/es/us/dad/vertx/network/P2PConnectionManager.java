@@ -2,6 +2,7 @@ package es.us.dad.vertx.network;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.*;
@@ -163,7 +164,7 @@ public class P2PConnectionManager extends AbstractVerticle {
         // --- MÁQUINA DE ESTADOS PARA FRAMING (Length-Prefix) ---
         // Estado inicial: Esperar 4 bytes (Entero = Longitud)
         RecordParser parser = RecordParser.newFixed(4);
-
+        parser.maxRecordSize(10000);
         // Usamos un array de 1 posición como "wrapper" mutable para la lambda
         // true = Estamos esperando CABECERA (longitud)
         // false = Estamos esperando CUERPO (json)
@@ -191,6 +192,13 @@ public class P2PConnectionManager extends AbstractVerticle {
             }
         });
 
+        parser.exceptionHandler(err -> {
+            System.out.println("Registro demasiado grande");
+            socket.close();
+        });
+
+
+
         long timerId = vertx.setPeriodic(5000, id -> {
             if (!activeSockets.contains(socket)) {
                 vertx.cancelTimer(id);
@@ -211,46 +219,67 @@ public class P2PConnectionManager extends AbstractVerticle {
 
     // --- PROCESADO DE MENSAJES (GOSSIP LOGIC) ---
     private void handleMessagePayload(Buffer buffer, NetSocket originSocket) {
+        String raw = buffer.toString();
+        JsonObject msg;
+
         try {
-            JsonObject msg = new JsonObject(buffer.toString());
-            String type = msg.getString("type");
-            String msgId = msg.getString("hash");
-
-            // 1. HANDSHAKE (Caso especial, no se difunde)
-            if ("HANDSHAKE".equals(type)) {
-                int remotePort = msg.getJsonObject("data").getInteger("listenPort");
-                System.out.println("🤝 Handshake recibido de " + originSocket.remoteAddress().host() + ":" + remotePort);
-                return;
-            }
-
-            // 2. GOSSIP CHECK: Evitar bucles
-            if (msgId != null) {
-                if (seenMessagesCache.contains(msgId)) {
-                    // Ya lo he visto, lo ignoro
-                    return;
-                }
-                seenMessagesCache.add(msgId);
-            }
-
-            System.out.println("📩 P2P Recibido: " + type);
-
-            // 3. ENRUTAR AL INTERIOR (EventBus)
-            if ("BLOCK".equals(type)) {
-                vertx.eventBus().publish(BusAddresses.INCOMING_BLOCK, msg.getJsonObject("data"));
-            } else if ("TRANSACTION".equals(type)) {
-                vertx.eventBus().publish(BusAddresses.INCOMING_TRANSACTION, msg.getJsonObject("data"));
-            }
-
-            // 4. REENVIAR A VECINOS (Flood)
-            // Reenviamos a todos menos al que me lo envió (mejora de eficiencia)
-            broadcastMessageExcept(msg, originSocket);
-        } catch(Exception e){
-            // CERRAR SOCKET AQUI
-            System.err.println("⚠️ Payload corrupto: " + e.getMessage());
+            msg = new JsonObject(raw);
+        } catch (Exception e) {
+            System.err.println("⚠️ Payload corrupto o no JSON: " + e.getMessage());
+            originSocket.write("ERROR: invalid envelope\n");
             originSocket.close();
+            return;
         }
-    }
 
+        String type = msg.getString("type");
+        JsonObject payload = msg.getJsonObject("payload");
+
+        // AHORA msgId VIENE DESDE EL PAYLOAD
+        String msgId = payload != null ? payload.getString("msgId") : null;
+
+        if (type == null || payload == null) {
+            originSocket.write("ERROR: invalid envelope, expected {\"type\":\"...\",\"payload\":{...}}\n");
+            originSocket.close();
+            return;
+        }
+
+        if ("HANDSHAKE".equals(type)) {
+            Integer remotePort = payload.getInteger("listenPort");
+            System.out.println("🤝 Handshake recibido de " + originSocket.remoteAddress().host() + ":" + remotePort);
+            return;
+        }
+
+        // GOSSIP CHECK
+        if (msgId != null) {
+            boolean firstSeen = seenMessagesCache.add(msgId);
+            if (!firstSeen) {
+                return; // ya visto
+            }
+        }
+
+        System.out.println("📩 P2P Recibido: " + type);
+
+        switch (type) {
+            case "BLOCK":
+                vertx.eventBus().publish(BusAddresses.INCOMING_BLOCK, payload);
+                break;
+            case "TRANSACTION":
+                vertx.eventBus().publish(BusAddresses.INCOMING_TRANSACTION, payload);
+                break;
+            default:
+                System.out.println("Tipo desconocido: " + type);
+        }
+
+        // REENVÍO: msgId debe seguir dentro del payload
+        JsonObject newPayload = payload.copy();
+        newPayload.put("msgId", msgId);
+
+        JsonObject toBroadcast = new JsonObject()
+                .put("type", type)
+                .put("payload", newPayload);
+
+        broadcastMessageExcept(toBroadcast, originSocket);
+    }
 
     // --- DIFUSIÓN (WRITE WITH FRAMING) ---
 
@@ -293,7 +322,7 @@ public class P2PConnectionManager extends AbstractVerticle {
     private void sendHandshake(NetSocket socket) {
         JsonObject handshake = new JsonObject()
                 .put("type", "HANDSHAKE")
-                .put("data", new JsonObject()
+                .put("payload", new JsonObject()
                         .put("listenPort", this.listenPort)
                         .put("version", 1));
 
