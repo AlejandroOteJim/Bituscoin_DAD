@@ -1,6 +1,7 @@
 package es.us.dad.vertx.entities;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import io.vertx.core.Vertx;
@@ -25,22 +26,51 @@ public class BlockChain {
     // Se usa 'transient' para evitar que el serializador intente convertir el motor entero de Vert.x a JSON, lo cual causaría un error fatal.
     private transient Vertx vertx;
 
+    private static HashMap<String, Block> hashes = new HashMap<>();
+
     public BlockChain() { // nos llama al constructor el miner
         // APARTADO 2
         // Ajustamos el constructor para tener en cuenta el Vertx, la API que nos da acceso al fileSystem
         this.vertx = Vertx.vertx(); // mirar si aquí estás creando una instancia nueva o mirando la que ya tenemos
         this.chain = new ArrayList<>();
-        // Creamos el Génesis
-        chain.add(createGenesisBlock());
-        // APARTADO 2
-        // Comprobación inicial de seguridad durante el arranque del nodo.
-        // Se usa la versión síncrona (Blocking) excepcionalmente aquí porque estamos en el constructor
-        // y necesitamos garantizar que la carpeta "data" existe antes de aceptar bloques.
+
+        loadChainFromDisk();
+    }
+
+    private void loadChainFromDisk() {
         if (!this.vertx.fileSystem().existsBlocking("data")) { // te bloquea el worker verticle del miner
-            this.vertx.fileSystem().mkdirsBlocking("data"); // mira si existe y sino la crea
+            this.vertx.fileSystem().mkdirsBlocking("data"); // mira si existe y si no la crea
         }
 
-        // mirar qué te pasaría si no tienes eso
+        if (this.vertx.fileSystem().existsBlocking(STORAGE_PATH)) {
+            try {
+                // leemos el archivo entero de forma síncrona
+                io.vertx.core.buffer.Buffer buffer = this.vertx.fileSystem().readFileBlocking(STORAGE_PATH);
+
+                if (buffer.length() > 0) {
+                    io.vertx.core.json.JsonArray jsonArray = new io.vertx.core.json.JsonArray(buffer);
+
+                    for (int i = 0; i < jsonArray.size(); i++) { // recorremos la blockchain y lo vamos metiendo en el array
+                        io.vertx.core.json.JsonObject blockJson = jsonArray.getJsonObject(i);
+                        Block block = new Block(blockJson);
+                        this.chain.add(block);
+                        this.hashes.put(block.getHash(), block);
+                    }
+                    System.out.println("📦 Blockchain cargada desde disco con éxito: " + this.chain.size() + " bloques.");
+                    return;
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Error leyendo el archivo, empezaremos desde el génesis: " + e.getMessage());
+            }
+        }
+
+        // el archivo no existe, está vacío o hubo un error al leer
+        System.out.println("❗❗ No se encontró blockchain previa en disco. Generamos bloque génesis");
+        this.chain.add(createGenesisBlock());
+        Block genesis = this.chain.get(this.chain.size() - 1);
+        this.hashes.put(genesis.getHash(), genesis);
+
+        saveChainToDisk();
     }
 
     // 1. OBTENER ÚLTIMO BLOQUE
@@ -92,9 +122,31 @@ public class BlockChain {
             throw new RuntimeException("❌ Rechazado: El hash no cumple la prueba de trabajo (No minado)");
         }  DICE QUE HAY QUE QUITARLO   -------------------------------------- */
 
-        // SI TODO ESTÁ BIEN, LO AÑADIMOS
         System.out.println("✅ Bloque #" + newBlock.getHeader().getIndex() + " añadido a la cadena.");
         this.chain.add(newBlock);
+
+        saveChainToDisk(); // Funcion que hace el append
+
+        System.out.println(getBlockByIndex(3));
+    }
+
+    private void saveChainToDisk() {
+        io.vertx.core.json.JsonArray jsonArray = new io.vertx.core.json.JsonArray(); // JsonArray nativo de Vert.x
+
+        for (Block block : this.chain) {
+            jsonArray.add(block.toJson()); // vamos metiendo cada bloque como json en el array
+        }
+
+        // convertimos a buffer para poder meterlo en la función siguiente
+        io.vertx.core.buffer.Buffer buffer = io.vertx.core.buffer.Buffer.buffer(jsonArray.encodePrettily());
+
+        this.vertx.fileSystem().writeFile(STORAGE_PATH, buffer)
+                .onSuccess(v -> {
+                    System.out.println("----> Blockchain serializada y guardada en disco correctamente.");
+                })
+                .onFailure(error -> {
+                    System.err.println("!!!!!! Error al guardar la blockchain en disco: " + error.getMessage());
+                });
     }
 
     public Block createNextBlock(Body body) {
@@ -207,5 +259,17 @@ public class BlockChain {
 
     public List<Block> getChain() {
         return chain;
+    }
+
+    public Block getBlockByHash(String hash) {
+        return hashes.get(hash);
+    }
+
+    public Block getBlockByIndex(long index) {
+        if (index < 0 || index >= chain.size()) { // si el índice que nos están pidiendo no es válido
+            System.out.println("⚠️ Solicitud de bloque fuera de rango: Índice " + index);
+            return null;
+        }
+        return chain.get((int) index);
     }
 }
