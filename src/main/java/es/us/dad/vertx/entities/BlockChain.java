@@ -55,6 +55,12 @@ public class BlockChain {
                         Block block = new Block(blockJson);
                         this.chain.add(block);
                         this.hashes.put(block.getHash(), block);
+
+                        if(!block.calculateHash().equals(block.getHash())) {
+                            System.err.println("ERROR!!!!! HASH CORRUPTO. Detenemos el arranque del nodo.");
+                            vertx.close(); // cerramos nuestra instancia de vertx
+                            System.exit(1); // detenemos la ejecución
+                        }
                     }
                     System.out.println("📦 Blockchain cargada desde disco con éxito: " + this.chain.size() + " bloques.");
                     return;
@@ -83,51 +89,14 @@ public class BlockChain {
     public void addBlock(Block newBlock) {
         Block previousBlock = getLatestBlock();
 
-        // tenemos que hacer un if para saber si meterlo o no?? ver validateblock
-
-        /*
-        // CASO ESPECIAL: Si es el primer bloque tras el Génesis
-        if (previousBlock != null) { // si el anterior no es el génesis??
-
-            // 1. VALIDAR ENLACE (Continuidad)
-            // El bloque nuevo YA debe traer puesto el hash del anterior.
-            if (newBlock.getHeader().getIndex() > 0 && !newBlock.getHeader().getPreviousHash().equals(previousBlock.getHash())) {
-                throw new RuntimeException("❌ Rechazado: El bloque no apunta al último bloque de la cadena");
-            }
-
-            // 2. VALIDAR ÍNDICE (Orden)
-            if (newBlock.getHeader().getIndex() != previousBlock.getHeader().getIndex() + 1) {
-                throw new RuntimeException("❌ Rechazado: El índice del bloque es incorrecto");
-            }
-        }
-
-        // 3. VALIDAR INTEGRIDAD (¿El hash coincide con el contenido?)
-        // Calculamos el hash de lo que nos llega y comparamos con lo que dice tener.
-        String calculatedHash = newBlock.calculateHash();
-        if (!calculatedHash.equals(newBlock.getHash())) {
-            throw new RuntimeException("❌ Rechazado: El hash del bloque no es consistente (datos modificados)");
-        }
-
-        // 4. VALIDAR DIFICULTAD (Proof of Work)
-        // Generamos el string de ceros (ej: "0000")
-        String target = new String(new char[this.currentDifficulty]).replace('\0', '0');
-
-        // a) ¿El bloque dice tener la dificultad correcta?
-        if (newBlock.getHeader().getDifficulty() < this.currentDifficulty) {
-            throw new RuntimeException("❌ Rechazado: Dificultad inferior a la requerida");
-        }
-
-        // b) ¿El hash realmente empieza por esos ceros?
-        if (!newBlock.getHash().startsWith(target)) {
-            throw new RuntimeException("❌ Rechazado: El hash no cumple la prueba de trabajo (No minado)");
-        }  DICE QUE HAY QUE QUITARLO   -------------------------------------- */
-
         System.out.println("✅ Bloque #" + newBlock.getHeader().getIndex() + " añadido a la cadena.");
         this.chain.add(newBlock);
 
         saveChainToDisk(); // Funcion que hace el append
 
-        System.out.println(getBlockByIndex(3));
+        // System.out.println(getBlockByHash("aakshdfqiuewfsbdjfvbuiaefnd")); prueba búsqueda por índice
+        // System.out.println(getBlockByIndex(3)); prueba función búsqueda por índice
+        System.out.println(getBlocksFromIndex(1));
     }
 
     private void saveChainToDisk() {
@@ -142,7 +111,7 @@ public class BlockChain {
 
         this.vertx.fileSystem().writeFile(STORAGE_PATH, buffer)
                 .onSuccess(v -> {
-                    System.out.println("----> Blockchain serializada y guardada en disco correctamente.");
+                    System.out.println("----> Blockchain serializada y guardada en disco correctamente");
                 })
                 .onFailure(error -> {
                     System.err.println("!!!!!! Error al guardar la blockchain en disco: " + error.getMessage());
@@ -271,5 +240,20 @@ public class BlockChain {
             return null;
         }
         return chain.get((int) index);
+    }
+
+    public List<Block> getBlocksFromIndex(long startIndex) {
+        List<Block> bloques = new ArrayList<>();
+        if (startIndex < 0 || startIndex >= chain.size()) {
+            System.err.println("Índice inválido");
+        } else {
+            if(startIndex == this.chain.size() - 1){
+                // si nuestro parámetro es el último elemento de la blockchain
+                bloques.add(this.chain.get((int)startIndex));
+            } else {
+                bloques = this.chain.subList((int) startIndex, this.chain.size());
+            }
+        }
+        return bloques;
     }
 }
