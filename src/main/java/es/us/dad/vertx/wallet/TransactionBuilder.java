@@ -125,10 +125,6 @@ public class TransactionBuilder {
         // transactionId = SHA-256 hex (Punto 8, ya era así en el proyecto)
         Transaction tx = new Transaction(sender,receiver,amount,fee);
 
-        // -- 4. Firmar el transactionId con SecurityUtils del Modulo 8 (Punto 2) --
-        byte[] signatureBytes = SecurityUtils.applyECDSASig(privateKey,tx.getTransactionId());
-        String signatureB64 = Base64.getEncoder().encodeToString(signatureBytes);
-        tx.setSignature(signatureB64);
 
         // -- 5. Construir outputs UTXO con lógica de change (Punto 6) -----
         List<TransactionOutput> txOutputs = new ArrayList<>();
@@ -149,16 +145,32 @@ public class TransactionBuilder {
         // -- 6. Construir inputs UTXO (el unlockingScript es la firma ECDSA) --
         List<TransactionInput> txInputs = new ArrayList<>();
         for(PendingInput pendingInput : pendingInputs){
-            txInputs.add(new TransactionInput(pendingInput.prevTxId, pendingInput.outputIndex, signatureB64));
+            txInputs.add(new TransactionInput(pendingInput.prevTxId, pendingInput.outputIndex, ""));
         }
         tx.setInputs(txInputs);
+
+        tx.setTransactionId(tx.calculateHash());
+
+        // -- 7. Firmar el transactionId con SecurityUtils del Modulo 8 --
+        byte[] signatureBytes = SecurityUtils.applyECDSASig(privateKey,tx.getTransactionId());
+        String signatureB64 = Base64.getEncoder().encodeToString(signatureBytes);
+        tx.setSignature(signatureB64);
+
+        List<TransactionInput> signedInputs = new ArrayList<>();
+        for (PendingInput pendingInput : pendingInputs) {
+            signedInputs.add(new TransactionInput(
+                    pendingInput.prevTxId,
+                    pendingInput.outputIndex,
+                    signatureB64
+            ));
+        }
+        tx.setInputs(signedInputs);
 
         System.out.printf(
                 "[TransactionBuilder] ✔ TX construida → id=%s... | %s... → %s... | amount=%d fee=%d%n", tx.getTransactionId().substring(0, 8),
                 sender.substring(0, Math.min(16, sender.length())),
                 receiver.substring(0, Math.min(16, receiver.length())),
                 amount, fee);
-
         return tx;
     }
 
