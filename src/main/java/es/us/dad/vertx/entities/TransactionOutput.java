@@ -40,6 +40,6 @@ public class TransactionOutput {
     @Override
     public String toString() {
         int len = Math.min(16, recipientAddress.length());
-        return "Output{to=" + recipientAddress.substring(0, len) + "..., amount=" + amount + ", spent=" + spent + "}";
+        return "Output{address=" + recipientAddress.substring(0, len) + "..., amount=" + amount + ", spent=" + spent + "}";
     }
 }
