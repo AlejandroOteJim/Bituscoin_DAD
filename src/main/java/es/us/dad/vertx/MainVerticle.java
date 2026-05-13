@@ -24,7 +24,7 @@ public class MainVerticle extends AbstractVerticle {
                 System.out.println("\n🚀 =======================================");
                 System.out.println("   NODO BITUSCOIN INICIADO CORRECTAMENTE");
                 // ... resto de logs ...
-                System.out.println("=======================================\n");
+                System.out.println("========================================\n");
                 startPromise.complete();
             } else {
                 System.err.println("❌ Error fatal iniciando el nodo: " + res.cause().getMessage());
