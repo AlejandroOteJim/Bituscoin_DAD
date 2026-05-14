@@ -68,6 +68,7 @@ public class MempoolManager {
         //Evitar duplicar, usando concureentHashMap, O(1)
         if(!txMap.containsKey(tx.getTransactionId())){
             txMap.put(tx.getTransactionId(),tx);
+            transactionPool.add(tx);
         }else{
             return;
         }
