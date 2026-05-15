@@ -96,7 +96,7 @@ public class BlockChain {
 
         // System.out.println(getBlockByHash("aakshdfqiuewfsbdjfvbuiaefnd")); prueba búsqueda por índice
         // System.out.println(getBlockByIndex(3)); prueba función búsqueda por índice
-        System.out.println(getBlocksFromIndex(1));
+        //System.out.println(getBlocksFromIndex(1));
     }
 
     private void saveChainToDisk() {
