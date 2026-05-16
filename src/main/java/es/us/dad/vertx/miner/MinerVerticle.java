@@ -31,15 +31,18 @@ public class MinerVerticle extends AbstractVerticle {
     // CAMBIO 1: Instancia del worker de Proof-of-Work.
     private PoWMiner poWMiner = new PoWMiner();
 
+    public MinerVerticle(BlockChain blockChain) {
+        this.blockchain = blockChain;
+    }
     @Override
     public void start() {
         // Inicializamos la blockchain (esto crea el bloque Génesis internamente)
-        this.blockchain = new BlockChain();
+        //this.blockchain = new BlockChain();
 
         // ---------------------------------------------------------
         // 1. Escuchar bloques que vienen de INTERNET (P2P)
         // ---------------------------------------------------------
-        vertx.eventBus().consumer(BusAddresses.INCOMING_BLOCK, msg -> {
+        vertx.eventBus().consumer(BusAddresses.BLOCK_ACCEPTED, msg -> {
             try {
                 JsonObject blockJson = (JsonObject) msg.body();
                 Block receivedBlock = new Block(blockJson);
@@ -144,8 +147,10 @@ public class MinerVerticle extends AbstractVerticle {
 
                 try {
                     // Intentamos añadir a la cadena y difundir
-                    blockchain.addBlock(minedBlock);
-                    vertx.eventBus().publish(BusAddresses.MINED_BLOCK, minedBlock.toJson());
+                    //blockchain.addBlock(minedBlock);
+
+                    System.out.println("📤 Enviando bloque minado al Validador...");
+                    vertx.eventBus().publish(BusAddresses.INCOMING_BLOCK, minedBlock.toJson());
 
                 } catch (RuntimeException e) {
                     // ¡HEMOS PERDIDO LA CARRERA!
