@@ -10,7 +10,7 @@ public class BusAddresses {
     public static final String NEW_TRANSACTION = "internal.new.transaction";
 
     // --- COMUNICACIÓN ENTRANTE (Lo que viene de internet) ---
-
+    public static final String BLOCK_ACCEPTED = "BLOCK_ACCEPTED";
     // P2PConnectionManager publica aquí cuando recibe un BLOQUE de otro nodo
     public static final String INCOMING_BLOCK = "p2p.incoming.block";
 

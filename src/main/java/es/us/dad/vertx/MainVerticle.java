@@ -1,5 +1,6 @@
 package es.us.dad.vertx;
 
+import es.us.dad.vertx.entities.BlockChain;
 import es.us.dad.vertx.miner.MinerVerticle;
 import es.us.dad.vertx.network.PeerManager;
 import es.us.dad.vertx.wallet.WalletVerticle;
@@ -18,13 +19,14 @@ public class MainVerticle extends AbstractVerticle {
         Future<String> p2pDeploy = vertx.deployVerticle(new PeerManager(), options);
         Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(), options);
         Future<String> walletDeploy = vertx.deployVerticle(new WalletVerticle(), options);
+        Future<String> validatorDeploy = vertx.deployVerticle(new BlockValidator(sharedBlockchain));
 
-        Future.all(p2pDeploy, minerDeploy, walletDeploy).onComplete(res -> {
+        Future.all(validatorDeploy,p2pDeploy, minerDeploy, walletDeploy).onComplete(res -> {
             if (res.succeeded()) {
                 System.out.println("\n🚀 =======================================");
                 System.out.println("   NODO BITUSCOIN INICIADO CORRECTAMENTE");
                 // ... resto de logs ...
-                System.out.println("=======================================\n");
+                System.out.println("========================================\n");
                 startPromise.complete();
             } else {
                 System.err.println("❌ Error fatal iniciando el nodo: " + res.cause().getMessage());
