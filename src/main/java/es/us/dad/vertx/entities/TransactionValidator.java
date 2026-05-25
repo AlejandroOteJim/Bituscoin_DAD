@@ -3,159 +3,443 @@ package es.us.dad.vertx.entities;
 import es.us.dad.vertx.utils.SecurityUtils;
 
 import java.security.PublicKey;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class TransactionValidator {
 
-    // ===================================================
-    // 2. Estado en memoria (balances)
-    // ===================================================
-    private Map<String, Long> balances = new HashMap<>();
+    // =========================================================
+    // PUNTO 2 — Estructuras de datos para el estado en memoria
+    // =========================================================
 
-    // ===================================================
-    // 9. Anti-replay (transacciones ya procesadas)
-    // ===================================================
-    private Set<String> processedTransactions = new HashSet<>();
+    // UTXO Set confirmado
+    private final Map<String, TransactionOutput> utxoSet = new HashMap<>();
+
+    // UTXO Set pendiente (mempool)
+    private final Map<String, TransactionOutput> pendingUtxoSet = new HashMap<>();
+
+    // IDs ya procesados
+    private final Set<String> seenTransactionIds = new HashSet<>();
 
 
-    // ===================================================
-    // 8. Validación para la mempool
-    // Tiene en cuenta transacciones pendientes
-    // ===================================================
-    public boolean validateForMempool(Transaction tx, List<Transaction> mempool) {
+    // =========================================================
+    // RECONSTRUCCIÓN DEL ESTADO DESDE BLOCKCHAIN
+    // =========================================================
 
-        // 9. Anti-replay (bloques confirmados)
-        if (processedTransactions.contains(tx.getTransactionId()))
+    // Reconstruye completamente el estado UTXO a partir de la blockchain.
+    // Debe llamarse una vez al arrancar el nodo.
+    public void rebuildState(List<Block> blockchain) {
+
+        utxoSet.clear();
+
+        pendingUtxoSet.clear();
+
+        seenTransactionIds.clear();
+
+        for (Block block : blockchain) {
+
+            applyBlockToState(block);
+        }
+
+        pendingUtxoSet.putAll(utxoSet);
+
+        System.out.println("📒 [Notario] Estado reconstruido: " + utxoSet.size() + " UTXOs sin gastar.");
+    }
+
+
+    // =========================================================
+    // PUNTO 3 — Fondos suficientes
+    // =========================================================
+
+    // Comprueba que la suma de los inputs UTXO cubre amount + fee.
+    // Las coinbase se omiten porque crean monedas nuevas.
+    public boolean checkFunds(Transaction tx) {
+
+        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+
+        if (tx.getInputs() == null || tx.getInputs().isEmpty()) {
+
+            warn(tx, "TX normal sin inputs");
+
             return false;
+        }
 
-        // 9. Anti-replay (duplicados en mempool)
-        if (mempool.stream().anyMatch(t -> t.getTransactionId().equals(tx.getTransactionId())))
+        long totalInput = 0L;
+
+        for (TransactionInput input : tx.getInputs()) {
+
+            String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+            TransactionOutput utxo = utxoSet.get(key);
+
+            if (utxo != null) {
+
+                totalInput += utxo.getAmount();
+            }
+        }
+
+        long total = tx.getAmount() + tx.getFee();
+
+        if (totalInput < total) {
+
+            warn(tx, "fondos UTXO insuficientes. Total inputs=" + totalInput + " Necesario=" + total);
+
             return false;
-
-        // 4. Validación de formato
-        if (!validateFormat(tx)) return false;
-
-        // 5. Verificación del ID (hash)
-        if (!validateTransactionId(tx)) return false;
-
-        // 6. Verificación de firma
-        if (!validateAuthenticity(tx)) return false;
-
-        // 3. Comprobación de fondos
-        // 8. Considerando mempool
-        if (!checkFundsWithMempool(tx, mempool)) return false;
+        }
 
         return true;
     }
 
 
-    // ===================================================
-    // 4. Reglas de formato
-    // ===================================================
-    private boolean validateFormat(Transaction tx) {
+    // =========================================================
+    // PUNTO 4 — Reglas de formato
+    // =========================================================
 
-        if (tx.getAmount() <= 0) return false;
+    // Reglas mínimas:
+    // - amount > 0
+    // - sender != receiver
+    public boolean checkFormat(Transaction tx) {
 
-        if (tx.getSender().equals(tx.getReceiver())) return false;
+        if (tx.getAmount() <= 0) {
+
+            warn(tx, "amount debe ser > 0");
+
+            return false;
+        }
+
+        if (tx.getSender().equals(tx.getReceiver())) {
+
+            warn(tx, "sender y receiver son iguales");
+
+            return false;
+        }
 
         return true;
     }
 
 
-    // ===================================================
-    // 5. Verificación matemática del ID
-    // ===================================================
-    private boolean validateTransactionId(Transaction tx) {
+    // =========================================================
+    // PUNTO 5 — Integridad del ID
+    // =========================================================
 
-        String recalculated = tx.calculateHash();
+    // Recalcula el hash y comprueba que coincide con transactionId.
+    public boolean checkIntegrity(Transaction tx) {
 
-        return recalculated.equals(tx.getTransactionId());
+        String expected = tx.calculateHash();
+
+        if (!expected.equals(tx.getTransactionId())) {
+
+            warn(tx, "transactionId no coincide con el hash real");
+
+            return false;
+        }
+
+        return true;
     }
 
 
-    // ===================================================
-    // 1. Verificación de firma
-    // 6. Implementación ECDSA en método aislado
-    // ===================================================
+    // =========================================================
+    // PUNTO 6 — Autenticidad criptográfica (ECDSA)
+    // =========================================================
+
+    // Verifica criptográficamente la firma ECDSA.
+    // La clave pública se obtiene del sender.
     public boolean validateAuthenticity(Transaction tx) {
 
-        // Coinbase no se firma
-        if (tx.getSender().equals("COINBASE_SYSTEM"))
-            return true;
+        // Coinbase no requiere firma
+        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
 
-        if (tx.getSignature() == null)
+        if (tx.getSignature() == null || tx.getSignature().isBlank()) {
+
+            warn(tx, "sin firma");
+
             return false;
+        }
 
         try {
 
             PublicKey pubKey = SecurityUtils.decodePublicKey(tx.getSender());
 
-            byte[] sigBytes = Base64.getDecoder().decode(tx.getSignature());
+            byte[] sigBytes = java.util.Base64.getDecoder().decode(tx.getSignature());
 
-            return SecurityUtils.verifyECDSASig(
-                    pubKey,
-                    tx.getTransactionId(),
-                    sigBytes
-            );
+            boolean valid = SecurityUtils.verifyECDSASig(pubKey, tx.getTransactionId(), sigBytes);
+
+            if (!valid) warn(tx, "firma ECDSA inválida");
+
+            return valid;
 
         } catch (Exception e) {
+
+            warn(tx, "error verificando firma: " + e.getMessage());
+
             return false;
         }
     }
 
 
-    // ===================================================
-    // 3. Comprobación de fondos
-    // 8. Considerando mempool
-    // ===================================================
-    private boolean checkFundsWithMempool(Transaction tx, List<Transaction> mempool) {
+    // =========================================================
+    // PUNTO 7 — Actualizar estado tras confirmar un bloque
+    // =========================================================
 
-        if (tx.getSender().equals("COINBASE_SYSTEM"))
-            return true;
+    // Consume inputs y añade outputs nuevos al estado confirmado.
+    // También actualiza el estado pendiente de mempool.
+    public void updateState(Block block) {
 
-        long balance = balances.getOrDefault(tx.getSender(), 0L);
+        applyBlockToState(block);
 
-        // Restar transacciones pendientes
-        for (Transaction pendingTx : mempool) {
-            if (pendingTx.getSender().equals(tx.getSender())) {
-                balance -= pendingTx.getAmount();
-            }
-        }
-
-        return balance >= tx.getAmount();
+        System.out.println("📒 [Notario] Estado actualizado. Bloque #" + block.getHeader().getIndex() + " | " + block.getBody().getTransactions().size() + " TX" + " | " + utxoSet.size() + " UTXOs sin gastar.");
     }
 
 
-    // ===================================================
-    // 7. Actualizar estado tras bloque confirmado
-    // ===================================================
-    public void updateState(Block block) {
+    // =========================================================
+    // PUNTO 8 — Validación para la Mempool
+    // =========================================================
+
+    // Igual que validateTransaction() pero usando el estado pendiente.
+    // Detecta double-spend entre TX aún no minadas.
+    public boolean validateForMempool(Transaction tx) {
+
+        if (!checkFormat(tx)) return false;
+
+        if (!checkIntegrity(tx)) return false;
+
+        if (!validateAuthenticity(tx)) return false;
+
+        if (!checkAntiReplay(tx)) return false;
+
+        List<TransactionInput> inputs = tx.getInputs();
+
+        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+
+        if (inputs == null || inputs.isEmpty()) {
+
+            warn(tx, "[Mempool] TX normal sin inputs");
+
+            return false;
+        }
+
+        long totalInput = 0L;
+
+        // =====================================================
+        // FASE 1 — VALIDAR
+        // =====================================================
+
+        for (TransactionInput input : inputs) {
+
+            String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+            TransactionOutput utxo = pendingUtxoSet.get(key);
+
+            if (utxo == null) {
+
+                warn(tx, "[Mempool] UTXO no disponible: " + key);
+
+                return false;
+            }
+
+            // Verificar propietario del UTXO
+            if (!utxo.getRecipientAddress().equals(tx.getSender())) {
+
+                warn(tx, "[Mempool] sender no es propietario del UTXO");
+
+                return false;
+            }
+
+            totalInput += utxo.getAmount();
+        }
+
+        long totalOutput = tx.getOutputs().stream().mapToLong(TransactionOutput::getAmount).sum();
+
+        if (totalOutput > totalInput) {
+
+            warn(tx, "[Mempool] outputs superan inputs UTXO");
+
+            return false;
+        }
+
+        // =====================================================
+        // FASE 2 — APLICAR CAMBIOS
+        // =====================================================
+
+        // Consumir UTXOs pendientes
+        for (TransactionInput input : inputs) {
+
+            String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+            pendingUtxoSet.remove(key);
+        }
+
+        // Añadir nuevos outputs
+        List<TransactionOutput> outputs = tx.getOutputs();
+
+        for (int i = 0; i < outputs.size(); i++) {
+
+            pendingUtxoSet.put(utxoKey(tx.getTransactionId(), i), outputs.get(i));
+        }
+
+        seenTransactionIds.add(tx.getTransactionId());
+
+        System.out.println("✅ [Notario/Mempool] TX aceptada: " + tx.getTransactionId());
+
+        return true;
+    }
+
+
+    // =========================================================
+    // PUNTO 9 — Verificación UTXO e anti-replay
+    // =========================================================
+
+    // Verifica:
+    // - Que cada input referencia un UTXO existente
+    // - Que el sender es dueño del UTXO
+    // - Que outputs <= inputs
+    public boolean checkUtxoInputs(Transaction tx) {
+
+        List<TransactionInput> inputs = tx.getInputs();
+
+        // Coinbase no consume UTXOs
+        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+
+        if (inputs == null || inputs.isEmpty()) {
+
+            warn(tx, "TX normal sin inputs");
+
+            return false;
+        }
+
+        long totalInput = 0L;
+
+        for (TransactionInput input : inputs) {
+
+            String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+            TransactionOutput utxo = utxoSet.get(key);
+
+            if (utxo == null) {
+
+                warn(tx, "UTXO no disponible: " + key);
+
+                return false;
+            }
+
+            // El sender debe ser propietario del output
+            if (!utxo.getRecipientAddress().equals(tx.getSender())) {
+
+                warn(tx, "sender no es propietario del UTXO");
+
+                return false;
+            }
+
+            totalInput += utxo.getAmount();
+        }
+
+        long totalOutput = tx.getOutputs().stream().mapToLong(TransactionOutput::getAmount).sum();
+
+        if (totalOutput > totalInput) {
+
+            warn(tx, "outputs (" + totalOutput + ") superan inputs (" + totalInput + ")");
+
+            return false;
+        }
+
+        return true;
+    }
+
+
+    // Rechaza una TX cuyo ID ya fue procesado anteriormente
+    public boolean checkAntiReplay(Transaction tx) {
+
+        if (seenTransactionIds.contains(tx.getTransactionId())) {
+
+            warn(tx, "ID duplicado (anti-replay)");
+
+            return false;
+        }
+
+        return true;
+    }
+
+
+    // =========================================================
+    // PUNTO 10 — Validación completa para bloques
+    // =========================================================
+
+    // Validación conjunta de todos los métodos anteriores.
+    public boolean validateTransaction(Transaction tx) {
+
+        if (!checkFormat(tx)) return false;
+
+        if (!checkIntegrity(tx)) return false;
+
+        if (!validateAuthenticity(tx)) return false;
+
+        if (!checkFunds(tx)) return false;
+
+        if (!checkUtxoInputs(tx)) return false;
+
+        if (!checkAntiReplay(tx)) return false;
+
+        return true;
+    }
+
+
+    // =========================================================
+    // HELPERS PRIVADOS
+    // =========================================================
+
+    // Aplica todas las TX de un bloque confirmado al estado local.
+    private void applyBlockToState(Block block) {
 
         for (Transaction tx : block.getBody().getTransactions()) {
 
-            // 9. Marcar como procesada
-            processedTransactions.add(tx.getTransactionId());
+            applyTransactionToUtxoSet(tx, utxoSet);
 
-            // Restar saldo al emisor
-            if (!tx.getSender().equals("COINBASE_SYSTEM")) {
+            applyTransactionToUtxoSet(tx, pendingUtxoSet);
 
-                long senderBalance =
-                        balances.getOrDefault(tx.getSender(), 0L);
-
-                balances.put(
-                        tx.getSender(),
-                        senderBalance - tx.getAmount()
-                );
-            }
-
-            // Sumar saldo al receptor
-            long receiverBalance =
-                    balances.getOrDefault(tx.getReceiver(), 0L);
-
-            balances.put(
-                    tx.getReceiver(),
-                    receiverBalance + tx.getAmount()
-            );
+            seenTransactionIds.add(tx.getTransactionId());
         }
+    }
+
+    // Consume inputs y crea outputs nuevos dentro de un UTXO Set.
+    private void applyTransactionToUtxoSet(Transaction tx, Map<String, TransactionOutput> utxos) {
+
+        // Consumir inputs
+        if (tx.getInputs() != null) {
+
+            for (TransactionInput input : tx.getInputs()) {
+
+                String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+                utxos.remove(key);
+            }
+        }
+
+        // Añadir outputs nuevos
+        List<TransactionOutput> outputs = tx.getOutputs();
+
+        for (int i = 0; i < outputs.size(); i++) {
+
+            utxos.put(utxoKey(tx.getTransactionId(), i), outputs.get(i));
+        }
+    }
+
+    // Clave única de un output UTXO:
+    // Formato -> txId:outputIndex
+    // txId: id de la transacción referenciada
+    // outputIndex: índice correspondiente al output de esa transacción
+    private String utxoKey(String txId, int outputIndex) {
+
+        return txId + ":" + outputIndex;
+    }
+
+    // Función auxiliar para informar de fallos
+    private void warn(Transaction tx, String motivo) {
+
+        String shortId = tx.getTransactionId() != null ? tx.getTransactionId().substring(0, Math.min(12, tx.getTransactionId().length())) : "null";
+
+        System.out.println("❌ [Notario] TX " + shortId + "... rechazada: " + motivo);
     }
 }
