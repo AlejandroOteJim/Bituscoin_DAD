@@ -165,7 +165,7 @@ public class BlockValidator extends AbstractVerticle {
 
             // 8: Delegar la validación completa al Notario (TransactionValidator)
             // Esto ejecuta checkFormat, checkIntegrity, validateAuthenticity, checkFunds, checkUtxoInputs y checkAntiReplay
-            if (!transactionValidator.validateTransaction(tx)) {
+            if (!transactionValidator.validateAuthenticity(tx)) {
                 throw new RuntimeException("Transacción inválida rechazada por el Notario: " + tx.getTransactionId());
             }
         }

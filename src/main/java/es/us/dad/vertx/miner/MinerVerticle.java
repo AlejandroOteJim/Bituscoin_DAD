@@ -68,7 +68,7 @@ public class MinerVerticle extends AbstractVerticle {
 //            System.err.println("🚨 HACKER DETECTADO: Firma inválida en la TX " + tx.getTransactionId());
 //            return; // Descartamos la transacción inmediatamente
 //        }
-        if (!transactionValidator.validateForMempool(tx)) {
+        if (!transactionValidator.validateAuthenticity(tx)) {
             System.err.println("🚨 Transacción inválida o sin fondos rechazada de la Mempool: " + tx.getTransactionId());
             return; // Descartamos la transacción inmediatamente
         }
