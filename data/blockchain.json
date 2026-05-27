@@ -1,0 +1,91 @@
+[ {
+  "hash" : "15aae7c9b71973690a1bf16bc95c52f2e39f25a1f233d629a6963673d052ec39",
+  "header" : {
+    "version" : 1,
+    "index" : 0,
+    "timestamp" : 1700000000000,
+    "previousHash" : "0",
+    "merkleRoot" : "f162f87c6e736c47f6977a700d48a79020da76fd53a77656044f740ed5aa9650",
+    "nonce" : 0,
+    "difficulty" : 1
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "f162f87c6e736c47f6977a700d48a79020da76fd53a77656044f740ed5aa9650",
+      "sender" : "COINBASE_SYSTEM",
+      "receiver" : "admin",
+      "amount" : 5000000000,
+      "fee" : 0,
+      "timestamp" : 1700000000000,
+      "signature" : "GENESIS_FIXED_SIGNATURE",
+      "outputs" : [ ],
+      "inputs" : [ ]
+    } ]
+  }
+}, {
+  "hash" : "0000026bb1b3fea00c08d8df35eef8deecd984819e142a67047ab3f255d04210",
+  "header" : {
+    "version" : 1,
+    "index" : 1,
+    "timestamp" : 1779907249262,
+    "previousHash" : "15aae7c9b71973690a1bf16bc95c52f2e39f25a1f233d629a6963673d052ec39",
+    "merkleRoot" : "085299b81770c9e4335210b311d9b0917fbd91859f003df3b3d97353cb3cd7ff",
+    "nonce" : 130866,
+    "difficulty" : 4
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "242268323b54fa24cae344d2b0c14f38a8a28ab1ca16b14663865e51c5cd11cb",
+      "sender" : "COINBASE_SYSTEM",
+      "receiver" : "admin",
+      "amount" : 5000000000,
+      "fee" : 0,
+      "timestamp" : 1779907248980,
+      "signature" : "Mined by Bituscoin | Nonce:1062596027008500",
+      "outputs" : [ ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "c0f990273f210458550b3366696d0af7eba7a41ca1f55cde08a16c30f095b2d4",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvEMmVDY5UOhjUKhBX9cSViHfG4bjuX6QYTcEVTpF2bJ9XdRFczcSuUNAwOAWNeKn/KYnmfoJRRx7486goMUvPQ==",
+      "receiver" : "Receiver-864",
+      "amount" : 15,
+      "fee" : 1,
+      "timestamp" : 1779907238988,
+      "signature" : "MEQCIATbgC/L0mUGLVKt1y6m3OdeBFXCv7fd/q/+j8mYZpjSAiAZ0q9wEK0fHQDK6vjZXUua16LWOtrdiW15THR+aHXWWw==",
+      "outputs" : [ {
+        "address" : "Receiver-864",
+        "amount" : 15,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "56055d727f54ff6840cb3803fee3eba974d2b9661b2a6a7cb8d99cb332e51e2b",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvEMmVDY5UOhjUKhBX9cSViHfG4bjuX6QYTcEVTpF2bJ9XdRFczcSuUNAwOAWNeKn/KYnmfoJRRx7486goMUvPQ==",
+      "receiver" : "Receiver-227",
+      "amount" : 19,
+      "fee" : 1,
+      "timestamp" : 1779907243969,
+      "signature" : "MEUCIH8hgPbTra9bI1b+I2HX1xHvyUnlM469tqFA5H+6giziAiEAg02yqaBXpRMyysrI0+57Z9t2Z+1Ajj38K0zn1QFvBuU=",
+      "outputs" : [ {
+        "address" : "Receiver-227",
+        "amount" : 19,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "536296889454f383acd5e480219c989dedd4c0ceb3d528c7a420e8489d6baf58",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvEMmVDY5UOhjUKhBX9cSViHfG4bjuX6QYTcEVTpF2bJ9XdRFczcSuUNAwOAWNeKn/KYnmfoJRRx7486goMUvPQ==",
+      "receiver" : "Receiver-839",
+      "amount" : 16,
+      "fee" : 1,
+      "timestamp" : 1779907248973,
+      "signature" : "MEQCIAHepOWREjITTMpKc+mkdU6WDldXwvwSwZwLFZHd/vzIAiAiggtUVkt262tCxxMt4kU6Vz7/aBHDUv1lxyDpNAuOlA==",
+      "outputs" : [ {
+        "address" : "Receiver-839",
+        "amount" : 16,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    } ]
+  }
+} ]
