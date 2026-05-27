@@ -2,8 +2,6 @@ package es.us.dad.vertx.network;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.buffer.Buffer;
-import io.vertx.core.json.DecodeException;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.*;
 import io.vertx.core.parsetools.RecordParser;
@@ -13,7 +11,6 @@ import io.vertx.core.Promise;
 public class P2PConnectionManager extends AbstractVerticle {
 
     private int listenPort;
-    private Map<String, Integer> intentosConexion;
     // Lista de sockets activos (nuestros "vecinos")
     private final List<NetSocket> activeSockets = new ArrayList<>();
 
@@ -30,12 +27,20 @@ public class P2PConnectionManager extends AbstractVerticle {
             }
     );
 
-
-
     @Override
     public void start(Promise<Void> startPromise) {
-        // Levantar Servidor (Escucha conexiones entrantes)
-        initServer();
+        // 1. Configuración: Leer puerto y semilla
+        this.listenPort = config().getInteger("p2p.port", 6000);
+        String seed = config().getString("p2p.seed.ip", ""); // Ej: "localhost:6000"
+
+        // 2. Levantar Servidor (Escucha conexiones entrantes)
+        startServer();
+
+        // 3. Conectar a Semilla (Si existe en config)
+        if (!seed.isEmpty()) {
+            connectToPeer(seed);
+        }
+
         // 4. CONSUMIDORES DEL EVENTBUS (Comunicación Interna -> Externa)
 
         // A. Peticiones genéricas de difusión (ej: Wallet manda TX ya formateada)
@@ -48,20 +53,17 @@ public class P2PConnectionManager extends AbstractVerticle {
         vertx.eventBus().consumer(BusAddresses.MINED_BLOCK, msg -> {
             JsonObject blockJson = (JsonObject) msg.body();
 
-            //TODO 3:  Estandarizar sobre JSON de red
-
             // Construimos el mensaje de protocolo P2P
             JsonObject p2pMsg = new JsonObject()
                     .put("type", "BLOCK")
                     // Asumimos que el bloque tiene un hash calculado
-                    .put("payload", blockJson);
+                    .put("hash", blockJson.getString("hash"))
+                    .put("data", blockJson);
 
-            System.out.println("📢 Minero local encontró bloque " +
-                    p2pMsg.getJsonObject("payload").getString("hash").substring(0, 6) +
-                    "... Difundiendo.");
+            System.out.println("📢 Minero local encontró bloque " + p2pMsg.getString("hash").substring(0, 6) + "... Difundiendo.");
 
             // Lo marcamos como visto para no re-procesarlo si nos vuelve
-            seenMessagesCache.add(p2pMsg.getJsonObject("payload").getString("hash"));
+            seenMessagesCache.add(p2pMsg.getString("hash"));
 
             broadcastMessage(p2pMsg);
         });
@@ -71,18 +73,7 @@ public class P2PConnectionManager extends AbstractVerticle {
     }
 
     // --- LÓGICA DE SERVIDOR ---
-    // TODO 1: Extraer lógica de inicialización de server
-    private void initServer() {
-
-        // 1. Configuración: Leer puerto y semilla//
-        this.listenPort = config().getInteger("p2p.port", 6000);
-        String host = config().getString("p2p.seed", "");
-        intentosConexion = new HashMap<>();
-        // 2. Conectar a Semilla (Si existe en config)
-        if (!host.isEmpty()) {
-            connectToPeer(host, listenPort);
-        }
-
+    private void startServer() {
         NetServerOptions options = new NetServerOptions()
                 .setTcpKeepAlive(true);
         NetServer server = vertx.createNetServer(options);
@@ -102,21 +93,16 @@ public class P2PConnectionManager extends AbstractVerticle {
     }
 
     // --- LÓGICA DE CLIENTE (BOOTSTRAPPING) ---
-    // TODO 2: Extraer lógica de cliente
-    private void connectToPeer(String host, int port) {
-        String address = host + ":" + port;
-        int intentosMaximos = 5;
+    private void connectToPeer(String address) {
+        String[] parts = address.split(":");
+        String host = parts[0];
+        int port = Integer.parseInt(parts[1]);
 
         NetClientOptions options = new NetClientOptions().setTcpKeepAlive(true);
         NetClient client = vertx.createNetClient(options);
 
 
-        if(!intentosConexion.containsKey(address)){
-            intentosConexion.put(address, 0);
-        }
-
         System.out.println("🔌 Intentando conectar a semilla: " + address);
-        System.out.println("Intento nº " + intentosConexion.get(address));
 
         client.connect(port, host).onComplete(res -> {
             if (res.succeeded()) {
@@ -127,13 +113,7 @@ public class P2PConnectionManager extends AbstractVerticle {
                 // Enviar Handshake inicial al conectar
                 sendHandshake(socket);
             } else {
-                System.err.println("❌ No se pudo conectar a " + address + ", intentándolo de nuevo");
-                if (intentosConexion.get(address) <= 5) {
-                    intentosConexion.put(address, intentosConexion.get(address) + 1);
-                    connectToPeer(host, port);
-                } else {
-                    connectToPeer(host, port + 1);
-                }
+                System.err.println("❌ No se pudo conectar a " + address);
             }
         });
     }
@@ -148,11 +128,10 @@ public class P2PConnectionManager extends AbstractVerticle {
             activeSockets.remove(socket);
             System.out.println("❌ Conexión cerrada con " + socket.remoteAddress());
             // Reconexión solo si somos el cliente (tenemos semilla configurada)
-            int port = config().getInteger("p2p.port", 6000);
-            String host = config().getString("p2p.host", "");
-            if (!host.isEmpty()) {
+            String seed = config().getString("p2p.seed.ip", "");
+            if (!seed.isEmpty()) {
                 System.out.println("🔄 Reconectando en 3 segundos...");
-                vertx.setTimer(3000, id -> connectToPeer(host, port));
+                vertx.setTimer(3000, id -> connectToPeer(seed));
             }
         });
 
@@ -164,7 +143,7 @@ public class P2PConnectionManager extends AbstractVerticle {
         // --- MÁQUINA DE ESTADOS PARA FRAMING (Length-Prefix) ---
         // Estado inicial: Esperar 4 bytes (Entero = Longitud)
         RecordParser parser = RecordParser.newFixed(4);
-        parser.maxRecordSize(10000);
+
         // Usamos un array de 1 posición como "wrapper" mutable para la lambda
         // true = Estamos esperando CABECERA (longitud)
         // false = Estamos esperando CUERPO (json)
@@ -192,19 +171,12 @@ public class P2PConnectionManager extends AbstractVerticle {
             }
         });
 
-        parser.exceptionHandler(err -> {
-            System.out.println("Registro demasiado grande");
-            socket.close();
-        });
-
-
-
         long timerId = vertx.setPeriodic(5000, id -> {
             if (!activeSockets.contains(socket)) {
                 vertx.cancelTimer(id);
                 return;
             }
-            JsonObject ping = new JsonObject().put("type", "payload");
+            JsonObject ping = new JsonObject().put("type", "PING");
             Buffer payload = Buffer.buffer(ping.encode());
             Buffer frame = Buffer.buffer().appendInt(payload.length()).appendBuffer(payload);
             if (!socket.writeQueueFull()) {
@@ -219,66 +191,43 @@ public class P2PConnectionManager extends AbstractVerticle {
 
     // --- PROCESADO DE MENSAJES (GOSSIP LOGIC) ---
     private void handleMessagePayload(Buffer buffer, NetSocket originSocket) {
-        String raw = buffer.toString();
-        JsonObject msg;
-
         try {
-            msg = new JsonObject(raw);
-        } catch (Exception e) {
-            System.err.println("⚠️ Payload corrupto o no JSON: " + e.getMessage());
-            originSocket.write("ERROR: invalid envelope\n");
-            originSocket.close();
-            return;
-        }
+            JsonObject msg = new JsonObject(buffer.toString());
+            String type = msg.getString("type");
+            String msgId = msg.getString("hash");
 
-        String type = msg.getString("type");
-        JsonObject payload = msg.getJsonObject("payload");
-
-        // AHORA msgId VIENE DESDE EL PAYLOAD
-        String msgId = payload != null ? payload.getString("msgId") : null;
-
-        if (type == null || payload == null) {
-            originSocket.write("ERROR: invalid envelope, expected {\"type\":\"...\",\"payload\":{...}}\n");
-            originSocket.close();
-            return;
-        }
-
-        if ("HANDSHAKE".equals(type)) {
-            Integer remotePort = payload.getInteger("listenPort");
-            System.out.println("🤝 Handshake recibido de " + originSocket.remoteAddress().host() + ":" + remotePort);
-            return;
-        }
-
-        // GOSSIP CHECK
-        if (msgId != null) {
-            boolean firstSeen = seenMessagesCache.add(msgId);
-            if (!firstSeen) {
-                return; // ya visto
+            // 1. HANDSHAKE (Caso especial, no se difunde)
+            if ("HANDSHAKE".equals(type)) {
+                int remotePort = msg.getJsonObject("data").getInteger("listenPort");
+                System.out.println("🤝 Handshake recibido de " + originSocket.remoteAddress().host() + ":" + remotePort);
+                return;
             }
+
+            // 2. GOSSIP CHECK: Evitar bucles
+            if (msgId != null) {
+                if (seenMessagesCache.contains(msgId)) {
+                    // Ya lo he visto, lo ignoro
+                    return;
+                }
+                seenMessagesCache.add(msgId);
+            }
+
+            System.out.println("📩 P2P Recibido: " + type);
+
+            // 3. ENRUTAR AL INTERIOR (EventBus)
+            if ("BLOCK".equals(type)) {
+                vertx.eventBus().publish(BusAddresses.INCOMING_BLOCK, msg.getJsonObject("data"));
+            } else if ("TRANSACTION".equals(type)) {
+                vertx.eventBus().publish(BusAddresses.INCOMING_TRANSACTION, msg.getJsonObject("data"));
+            }
+
+            // 4. REENVIAR A VECINOS (Flood)
+            // Reenviamos a todos menos al que me lo envió (mejora de eficiencia)
+            broadcastMessageExcept(msg, originSocket);
+
+        } catch (Exception e) {
+            System.err.println("⚠️ Payload corrupto: " + e.getMessage());
         }
-
-        System.out.println("📩 P2P Recibido: " + type);
-
-        switch (type) {
-            case "BLOCK":
-                vertx.eventBus().publish(BusAddresses.INCOMING_BLOCK, payload);
-                break;
-            case "TRANSACTION":
-                vertx.eventBus().publish(BusAddresses.INCOMING_TRANSACTION, payload);
-                break;
-            default:
-                System.out.println("Tipo desconocido: " + type);
-        }
-
-        // REENVÍO: msgId debe seguir dentro del payload
-        JsonObject newPayload = payload.copy();
-        newPayload.put("msgId", msgId);
-
-        JsonObject toBroadcast = new JsonObject()
-                .put("type", type)
-                .put("payload", newPayload);
-
-        broadcastMessageExcept(toBroadcast, originSocket);
     }
 
     // --- DIFUSIÓN (WRITE WITH FRAMING) ---
@@ -322,7 +271,7 @@ public class P2PConnectionManager extends AbstractVerticle {
     private void sendHandshake(NetSocket socket) {
         JsonObject handshake = new JsonObject()
                 .put("type", "HANDSHAKE")
-                .put("payload", new JsonObject()
+                .put("data", new JsonObject()
                         .put("listenPort", this.listenPort)
                         .put("version", 1));
 
