@@ -17,7 +17,7 @@ public class MainVerticle extends AbstractVerticle {
     public void start(Promise<Void> startPromise) {
         DeploymentOptions options = new DeploymentOptions().setConfig(config());
         BlockChain sharedBlockchain = new BlockChain(); //Para que el validador y el minero compartan el blockchain
-        TransactionValidator validador = new TransactionValidator(sharedBlockchain);
+        TransactionValidator validador = new TransactionValidator(sharedBlockchain, options);
         Future<String> notaryDeploy = vertx.deployVerticle(validador);
         Future<String> p2pDeploy = vertx.deployVerticle(new P2PConnectionManager(), options);
         Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(sharedBlockchain, validador), options);
