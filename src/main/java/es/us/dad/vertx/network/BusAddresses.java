@@ -21,4 +21,13 @@ public class BusAddresses {
 
     // Publicar aquí para que P2PConnectionManager haga broadcast a todos los vecinos
     public static final String BROADCAST_REQUEST = "p2p.action.broadcast";
+
+    
+    // --- MONITORIZACION DE RED ---
+
+    // PeerManager publica aqui cuando un peer supera el handshake y queda activo
+    public static final String NETWORK_PEER_CONNECTED = "network.peer.connected";
+
+    // PeerManager publica aqui cuando un peer se desconecta o es expulsado
+    public static final String NETWORK_PEER_DISCONNECTED = "network.peer.disconnected";
 }

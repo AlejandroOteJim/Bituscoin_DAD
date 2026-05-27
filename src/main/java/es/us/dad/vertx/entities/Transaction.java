@@ -135,7 +135,7 @@ public class Transaction {
         return applySha256(sb.toString());
     }
 
-    // SOLUCIÓN: Método de validación criptográfica
+/*    // SOLUCIÓN: Método de validación criptográfica
     public boolean verifySignature() {
         // Excepción de sistema: Las CoinbaseTransactions no se verifican por ECDSA
         if (this.sender.equals("COINBASE_SYSTEM")) {
@@ -155,7 +155,7 @@ public class Transaction {
             return false;
         }
     }
-
+*/
     /**
      * Convierte el objeto a JSON para enviarlo por el EventBus o Red.
      */
