@@ -1,0 +1,259 @@
+[ {
+  "hash" : "15aae7c9b71973690a1bf16bc95c52f2e39f25a1f233d629a6963673d052ec39",
+  "header" : {
+    "version" : 1,
+    "index" : 0,
+    "timestamp" : 1700000000000,
+    "previousHash" : "0",
+    "merkleRoot" : "f162f87c6e736c47f6977a700d48a79020da76fd53a77656044f740ed5aa9650",
+    "nonce" : 0,
+    "difficulty" : 1
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "f162f87c6e736c47f6977a700d48a79020da76fd53a77656044f740ed5aa9650",
+      "sender" : "COINBASE_SYSTEM",
+      "receiver" : "admin",
+      "amount" : 5000000000,
+      "fee" : 0,
+      "timestamp" : 1700000000000,
+      "signature" : "GENESIS_FIXED_SIGNATURE",
+      "outputs" : [ ],
+      "inputs" : [ ]
+    } ]
+  }
+}, {
+  "hash" : "0000026bb1b3fea00c08d8df35eef8deecd984819e142a67047ab3f255d04210",
+  "header" : {
+    "version" : 1,
+    "index" : 1,
+    "timestamp" : 1779907249262,
+    "previousHash" : "15aae7c9b71973690a1bf16bc95c52f2e39f25a1f233d629a6963673d052ec39",
+    "merkleRoot" : "085299b81770c9e4335210b311d9b0917fbd91859f003df3b3d97353cb3cd7ff",
+    "nonce" : 130866,
+    "difficulty" : 4
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "242268323b54fa24cae344d2b0c14f38a8a28ab1ca16b14663865e51c5cd11cb",
+      "sender" : "COINBASE_SYSTEM",
+      "receiver" : "admin",
+      "amount" : 5000000000,
+      "fee" : 0,
+      "timestamp" : 1779907248980,
+      "signature" : "Mined by Bituscoin | Nonce:1062596027008500",
+      "outputs" : [ ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "c0f990273f210458550b3366696d0af7eba7a41ca1f55cde08a16c30f095b2d4",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvEMmVDY5UOhjUKhBX9cSViHfG4bjuX6QYTcEVTpF2bJ9XdRFczcSuUNAwOAWNeKn/KYnmfoJRRx7486goMUvPQ==",
+      "receiver" : "Receiver-864",
+      "amount" : 15,
+      "fee" : 1,
+      "timestamp" : 1779907238988,
+      "signature" : "MEQCIATbgC/L0mUGLVKt1y6m3OdeBFXCv7fd/q/+j8mYZpjSAiAZ0q9wEK0fHQDK6vjZXUua16LWOtrdiW15THR+aHXWWw==",
+      "outputs" : [ {
+        "address" : "Receiver-864",
+        "amount" : 15,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "56055d727f54ff6840cb3803fee3eba974d2b9661b2a6a7cb8d99cb332e51e2b",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvEMmVDY5UOhjUKhBX9cSViHfG4bjuX6QYTcEVTpF2bJ9XdRFczcSuUNAwOAWNeKn/KYnmfoJRRx7486goMUvPQ==",
+      "receiver" : "Receiver-227",
+      "amount" : 19,
+      "fee" : 1,
+      "timestamp" : 1779907243969,
+      "signature" : "MEUCIH8hgPbTra9bI1b+I2HX1xHvyUnlM469tqFA5H+6giziAiEAg02yqaBXpRMyysrI0+57Z9t2Z+1Ajj38K0zn1QFvBuU=",
+      "outputs" : [ {
+        "address" : "Receiver-227",
+        "amount" : 19,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "536296889454f383acd5e480219c989dedd4c0ceb3d528c7a420e8489d6baf58",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvEMmVDY5UOhjUKhBX9cSViHfG4bjuX6QYTcEVTpF2bJ9XdRFczcSuUNAwOAWNeKn/KYnmfoJRRx7486goMUvPQ==",
+      "receiver" : "Receiver-839",
+      "amount" : 16,
+      "fee" : 1,
+      "timestamp" : 1779907248973,
+      "signature" : "MEQCIAHepOWREjITTMpKc+mkdU6WDldXwvwSwZwLFZHd/vzIAiAiggtUVkt262tCxxMt4kU6Vz7/aBHDUv1lxyDpNAuOlA==",
+      "outputs" : [ {
+        "address" : "Receiver-839",
+        "amount" : 16,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    } ]
+  }
+}, {
+  "hash" : "0000f4b8439e17f43ea61a66038cf6991dc84f9e04fe8016d5791740f1c1ba97",
+  "header" : {
+    "version" : 1,
+    "index" : 2,
+    "timestamp" : 1779908381823,
+    "previousHash" : "0000026bb1b3fea00c08d8df35eef8deecd984819e142a67047ab3f255d04210",
+    "merkleRoot" : "7b4ccbbec88c4de52847f7073dfb53c19574eb284e3f9ca08ba7d32946e451e1",
+    "nonce" : 109428,
+    "difficulty" : 4
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "675a3876d04b5b82b8a7f447c9fc121c17eb5706b72fe6830d7465e7f005c408",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ3FXimq6VBwrny8f8/SAxu8i+xTv3pemiSFKSU4Wszz6M6n/cuu19BTBSh2qmXa4f9AxT3uM+9vbEQP9cMuA+Q==",
+      "receiver" : "Receiver-253",
+      "amount" : 18,
+      "fee" : 1,
+      "timestamp" : 1779908371828,
+      "signature" : "MEUCIE760dGAJlAHi1ZrWhf87MgieviPYoEIYfYsOcdKu3UDAiEA7qHJvvYvHYqR7FoCquLnWfBhsk03iI2Xbez32esnI4k=",
+      "outputs" : [ {
+        "address" : "Receiver-253",
+        "amount" : 18,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "9ee96c130763e0bf2fcf18453ae05c92f9fb402c68b74e80946ca3ec1bbbebae",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ3FXimq6VBwrny8f8/SAxu8i+xTv3pemiSFKSU4Wszz6M6n/cuu19BTBSh2qmXa4f9AxT3uM+9vbEQP9cMuA+Q==",
+      "receiver" : "Receiver-829",
+      "amount" : 9,
+      "fee" : 1,
+      "timestamp" : 1779908376823,
+      "signature" : "MEUCIQDOUy2LJJUfAe+zCYSR4Bc9rVyyBIrrHUyeKORUYDlZ0wIgZGoICxfKsPObjwdYp368t4OnWNZCqrfjSoyZ+/pTmv4=",
+      "outputs" : [ {
+        "address" : "Receiver-829",
+        "amount" : 9,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "aa98fd585eae765cb492720dc3561e7ea1cac81208fcc9a319982816fce2831d",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ3FXimq6VBwrny8f8/SAxu8i+xTv3pemiSFKSU4Wszz6M6n/cuu19BTBSh2qmXa4f9AxT3uM+9vbEQP9cMuA+Q==",
+      "receiver" : "Receiver-958",
+      "amount" : 15,
+      "fee" : 1,
+      "timestamp" : 1779908381814,
+      "signature" : "MEUCIQD0BOLmXRljhVrdQDN0IaJKINOO9uhPVkr0yxCD4Zm96wIgHKSsnaBwBR0XHlmLgmI+XGh3TqJOYYL5Q3CZ5vG7Ebg=",
+      "outputs" : [ {
+        "address" : "Receiver-958",
+        "amount" : 15,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    } ]
+  }
+}, {
+  "hash" : "0000a6bcab38d49379399d52b4878d38893722aa6c0cdb0752ef4092d25fac80",
+  "header" : {
+    "version" : 1,
+    "index" : 3,
+    "timestamp" : 1779912348706,
+    "previousHash" : "0000f4b8439e17f43ea61a66038cf6991dc84f9e04fe8016d5791740f1c1ba97",
+    "merkleRoot" : "9d798bfc83794e1663b39893b40699223632f512c995918194d0c50e27fa4f95",
+    "nonce" : 106981,
+    "difficulty" : 4
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "df918e968d991ba6132b21a343796b2a434ab28480ed6399a21a10d9ac146787",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEf20ylCaxHnIbOLnqPUpISPCDonVt9WNbAGTweIytaERWES93UHVVkU6skwRKkHCpNtCfP/CF7NimWKnBXr3ahQ==",
+      "receiver" : "Receiver-564",
+      "amount" : 16,
+      "fee" : 1,
+      "timestamp" : 1779912338703,
+      "signature" : "MEQCIDhCcXeeteQAYt+SZL8nup/q2vO+9zhymt9OcYUDMEIaAiBzGvRcB5jkqTQCCqjn4aLEJlNaW8BPNNXXnaj27q+DRA==",
+      "outputs" : [ {
+        "address" : "Receiver-564",
+        "amount" : 16,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "3493ef2b64282fc04215eb7040d603fff877dd98b691ee13a0c6adbef2354e24",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEf20ylCaxHnIbOLnqPUpISPCDonVt9WNbAGTweIytaERWES93UHVVkU6skwRKkHCpNtCfP/CF7NimWKnBXr3ahQ==",
+      "receiver" : "Receiver-685",
+      "amount" : 6,
+      "fee" : 1,
+      "timestamp" : 1779912343702,
+      "signature" : "MEUCID91yN7HInnxUmeQVqpzkEvTj4zAvf9P6lpyWDc0GvW1AiEA+shT70dvCwY18EVmOCE1v7N9rbU7wmrzf7f4nFKoBco=",
+      "outputs" : [ {
+        "address" : "Receiver-685",
+        "amount" : 6,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "546bbfb0e98154f0981e6a661cd1f60eefe8babe65b68ff2999bfbf8f0c6e9f1",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEf20ylCaxHnIbOLnqPUpISPCDonVt9WNbAGTweIytaERWES93UHVVkU6skwRKkHCpNtCfP/CF7NimWKnBXr3ahQ==",
+      "receiver" : "Receiver-654",
+      "amount" : 10,
+      "fee" : 1,
+      "timestamp" : 1779912348706,
+      "signature" : "MEUCIEvfh3mOdiE5TxQWzEUvFinee/U6qdEAAH/3iupbnLNMAiEAiV0OYexj+GGIBi93j/ob4BoK0Ur8l88IOvup1eSjGzw=",
+      "outputs" : [ {
+        "address" : "Receiver-654",
+        "amount" : 10,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    } ]
+  }
+}, {
+  "hash" : "00005d103f3910818853e93d9ddb6a821a7fa9eff367b7b1bccf85320a6c2977",
+  "header" : {
+    "version" : 1,
+    "index" : 4,
+    "timestamp" : 1779912363715,
+    "previousHash" : "0000a6bcab38d49379399d52b4878d38893722aa6c0cdb0752ef4092d25fac80",
+    "merkleRoot" : "fd92996b01bc8b5f37e916630ef9352156d900d413ccc2e00ef29646cd9904d1",
+    "nonce" : 3631,
+    "difficulty" : 4
+  },
+  "body" : {
+    "transactions" : [ {
+      "transactionId" : "92b930e6028ee695fe18f19b5698979228a8945fde6ee2b522a3e31df82bed58",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEf20ylCaxHnIbOLnqPUpISPCDonVt9WNbAGTweIytaERWES93UHVVkU6skwRKkHCpNtCfP/CF7NimWKnBXr3ahQ==",
+      "receiver" : "Receiver-459",
+      "amount" : 7,
+      "fee" : 1,
+      "timestamp" : 1779912353702,
+      "signature" : "MEUCIDBQRLZww30Ot7KnRRHt/TqXtUkU6COzUldluCOk3rLTAiEAzmVJ7jPyJd2c00SGSNJikbrOpTiGNSpXWdHNag62iBQ=",
+      "outputs" : [ {
+        "address" : "Receiver-459",
+        "amount" : 7,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "248b681fa98054a39b90ccc8562086de836fd60efd86e57141e61dd800301a24",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEf20ylCaxHnIbOLnqPUpISPCDonVt9WNbAGTweIytaERWES93UHVVkU6skwRKkHCpNtCfP/CF7NimWKnBXr3ahQ==",
+      "receiver" : "Receiver-62",
+      "amount" : 9,
+      "fee" : 1,
+      "timestamp" : 1779912358713,
+      "signature" : "MEYCIQDiIeAMv5fzMq+ZzmHAL2nJz5JF1ySvEctiHomEvg+9dQIhANiCzW142hwbXj9az1r0CWWtKw3SOwyff3BcvQ/c+dwe",
+      "outputs" : [ {
+        "address" : "Receiver-62",
+        "amount" : 9,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    }, {
+      "transactionId" : "5693fffc4ef1434be58c6be6c3e76150051b876d1d841fe16dc08926d95a0b5b",
+      "sender" : "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEf20ylCaxHnIbOLnqPUpISPCDonVt9WNbAGTweIytaERWES93UHVVkU6skwRKkHCpNtCfP/CF7NimWKnBXr3ahQ==",
+      "receiver" : "Receiver-941",
+      "amount" : 11,
+      "fee" : 1,
+      "timestamp" : 1779912363715,
+      "signature" : "MEUCIQDZgG/zRn5rkC2RQgvd8JyMbBhsz8ow8KdTOhpHTk0qpwIgf8SNh6s/JM1ho7kEKzQZ809khADyaN5EPEHEHyTIGPM=",
+      "outputs" : [ {
+        "address" : "Receiver-941",
+        "amount" : 11,
+        "spent" : false
+      } ],
+      "inputs" : [ ]
+    } ]
+  }
+} ]

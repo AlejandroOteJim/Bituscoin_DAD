@@ -7,7 +7,6 @@ import es.us.dad.vertx.network.BlockValidator;
 import es.us.dad.vertx.network.P2PConnectionManager;
 import es.us.dad.vertx.wallet.WalletVerticle;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.CompositeFuture;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -18,13 +17,14 @@ public class MainVerticle extends AbstractVerticle {
     public void start(Promise<Void> startPromise) {
         DeploymentOptions options = new DeploymentOptions().setConfig(config());
         BlockChain sharedBlockchain = new BlockChain(); //Para que el validador y el minero compartan el blockchain
+        TransactionValidator validador = new TransactionValidator(sharedBlockchain, options);
+        Future<String> notaryDeploy = vertx.deployVerticle(validador);
         Future<String> p2pDeploy = vertx.deployVerticle(new P2PConnectionManager(), options);
-        Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(sharedBlockchain), options);
+        Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(sharedBlockchain, validador), options);
         Future<String> walletDeploy = vertx.deployVerticle(new WalletVerticle(), options);
-        Future<String> validatorDeploy = vertx.deployVerticle(new BlockValidator(sharedBlockchain));
-        Future<String> transactionValidatorDeploy = vertx.deployVerticle(new TransactionValidator(sharedBlockchain));
+        Future<String> validatorDeploy = vertx.deployVerticle(new BlockValidator(sharedBlockchain, validador));
 
-        Future.all(validatorDeploy,p2pDeploy, minerDeploy, walletDeploy, transactionValidatorDeploy).onComplete(res -> {
+        Future.all(notaryDeploy, validatorDeploy,p2pDeploy, minerDeploy, walletDeploy).onComplete(res -> {
             if (res.succeeded()) {
                 System.out.println("\n🚀 =======================================");
                 System.out.println("   NODO BITUSCOIN INICIADO CORRECTAMENTE");

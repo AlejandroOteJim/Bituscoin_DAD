@@ -3,6 +3,7 @@ package es.us.dad.vertx.network;
 import es.us.dad.vertx.entities.Block;
 import es.us.dad.vertx.entities.BlockChain;
 import es.us.dad.vertx.entities.Transaction;
+import es.us.dad.vertx.entities.TransactionValidator;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonObject;
 
@@ -17,10 +18,12 @@ public class BlockValidator extends AbstractVerticle {
 
     // PASO 6: Lógica de "Orphan Blocks" (Memoria temporal)
     private final Map<String, Block> orphanBlocks;
+    private TransactionValidator transactionValidator;
 
     // Constructor donde inyectamos la Blockchain local
-    public BlockValidator(BlockChain blockChain) {
+    public BlockValidator(BlockChain blockChain, TransactionValidator transactionValidator) {
         this.blockChain = blockChain;
+        this.transactionValidator = transactionValidator;
         this.orphanBlocks = new HashMap<>();
     }
 
@@ -160,9 +163,10 @@ public class BlockValidator extends AbstractVerticle {
                 throw new RuntimeException("Fraude: Se encontró más de una transacción Coinbase en el bloque.");
             }
 
-            // 8: Delegar la verificación de firmas al Notario (SecurityUtils a través de Transaction)
-            if (!tx.verifySignature()) {
-                throw new RuntimeException("Firma ECDSA inválida en la transacción: " + tx.getTransactionId());
+            // 8: Delegar la validación completa al Notario (TransactionValidator)
+            // Esto ejecuta checkFormat, checkIntegrity, validateAuthenticity, checkFunds, checkUtxoInputs y checkAntiReplay
+            if (!transactionValidator.validateAuthenticity(tx)) {
+                throw new RuntimeException("Transacción inválida rechazada por el Notario: " + tx.getTransactionId());
             }
         }
     }
