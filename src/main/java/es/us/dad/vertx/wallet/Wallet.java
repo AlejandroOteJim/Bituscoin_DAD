@@ -22,7 +22,12 @@ public class Wallet {
         return SecurityUtils.encodeKey(publicKey);
     }
 
-    // SOLUCIÓN AL TODO: Creación y firma de la transacción
+    // Módulo 9: Punto 2 - Acceso a la clave privada para el KeyManager/Builder
+    public PrivateKey getPrivateKey() {
+        return this.privateKey;
+    }
+
+    // SOLUCIÓN AL TODO: Creación y firma de la transacción (legacy)
     public Transaction sendFunds(String receiver, long amount) {
         // 1. Instanciamos la TX. El constructor ya le asigna Timestamp y Hash inicial.
         Transaction newTx = new Transaction(this.getAddress(), receiver, amount);
@@ -34,5 +39,34 @@ public class Wallet {
         newTx.setSignature(Base64.getEncoder().encodeToString(signature));
 
         return newTx;
+    }
+
+    /**
+     * Módulo 9: Método que usa TransactionBuilder para crear transacciones.
+     * Encadena el patrón Builder: from() -> to() -> amount() -> fee() -> build()
+     * @param receiver Dirección pública del receptor
+     * @param amount   Cantidad a transferir
+     * @param fee      Comisión para el minero (puede ser 0)
+     * @return Transaction firmada lista para el EventBus
+     */
+    public Transaction buildTransaction(String receiver, long amount, long fee) {
+        try {
+            return new TransactionBuilder()
+                    .from(this.getAddress())
+                    .to(receiver)
+                    .amount(amount)
+                    .fee(fee)
+                    .build(this.privateKey);
+        } catch (Exception e) {
+            System.err.println("[Wallet] Error construyendo transacción: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Variante sin fee (fee = 0).
+     */
+    public Transaction buildTransaction(String receiver, long amount) {
+        return buildTransaction(receiver, amount, 0);
     }
 }
