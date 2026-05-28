@@ -40,13 +40,12 @@ public class TransactionValidator extends AbstractVerticle {
         this.blockchain = blockchain;
     }
 
-    // Al arrancar el verticle reconstruimos el estado UTXO desde la blockchain ya cargada
     @Override
     public void start(Promise<Void> startPromise) {
         if (blockchain != null) rebuildState(blockchain.getChain());
         System.out.println("📒 [Notario] TransactionValidator desplegado.");
-        vertx.eventBus().consumer(BusAddresses.BLOCK_ACCEPTED, msg -> {
-            Block block = new Block((JsonObject) msg.body());
+        vertx.eventBus().<JsonObject>consumer(BusAddresses.BLOCK_ACCEPTED, msg -> {
+            Block block = new Block(msg.body());
             updateState(block);
         });
         startPromise.complete();
@@ -57,7 +56,7 @@ public class TransactionValidator extends AbstractVerticle {
     // RECONSTRUCCIÓN DEL ESTADO DESDE BLOCKCHAIN
     // =========================================================
 
-    // Reconstruye completamente el estado UTXO a partir de la blockchain.
+    // Reconstruye el estado UTXO desde cero recorriendo todos los bloques.
     // Se llama automáticamente en start() al arrancar el nodo.
     public void rebuildState(List<Block> blockchain) {
         utxoSet.clear();
@@ -80,7 +79,7 @@ public class TransactionValidator extends AbstractVerticle {
     // Comprueba que la suma de los inputs UTXO cubre amount + fee.
     // Las coinbase se omiten porque crean monedas nuevas.
     public boolean checkFunds(Transaction tx) {
-        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+        if (isCoinbase(tx)) return true;
 
         if (tx.getInputs() == null || tx.getInputs().isEmpty()) {
             warn(tx, "TX normal sin inputs");
@@ -91,9 +90,7 @@ public class TransactionValidator extends AbstractVerticle {
         for (TransactionInput input : tx.getInputs()) {
             String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
             TransactionOutput utxo = utxoSet.get(key);
-            if (utxo != null) {
-                totalInput += utxo.getAmount();
-            }
+            if (utxo != null) totalInput += utxo.getAmount();
         }
 
         long total = tx.getAmount() + tx.getFee();
@@ -109,9 +106,7 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 4 — Reglas de formato
     // =========================================================
 
-    // Reglas:
-    // - amount > 0
-    // - sender != receiver
+    // Reglas mínimas: amount > 0 y sender != receiver
     public boolean checkFormat(Transaction tx) {
         if (tx.getAmount() <= 0) {
             warn(tx, "amount debe ser > 0");
@@ -129,8 +124,13 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 5 — Integridad del ID
     // =========================================================
 
-    // Recalcula el hash y comprueba que coincide con transactionId.
+    // Verifica que los outputs no están vacíos y que el transactionId coincide con el hash real.
     public boolean checkIntegrity(Transaction tx) {
+        if (tx.getOutputs() == null || tx.getOutputs().isEmpty()) {
+            warn(tx, "TX sin outputs");
+            return false;
+        }
+
         String expected = tx.calculateHash();
         if (!expected.equals(tx.getTransactionId())) {
             warn(tx, "transactionId no coincide con el hash real");
@@ -144,10 +144,9 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 6 — Autenticidad criptográfica (ECDSA)
     // =========================================================
 
-    // Verifica criptográficamente la firma ECDSA.
-    // La clave pública se obtiene del sender.
+    // Verifica criptográficamente la firma ECDSA con la clave pública del sender.
     public boolean validateAuthenticity(Transaction tx) {
-        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+        if (isCoinbase(tx)) return true;
 
         if (tx.getSignature() == null || tx.getSignature().isBlank()) {
             warn(tx, "sin firma");
@@ -170,8 +169,7 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 7 — Actualizar estado tras confirmar un bloque
     // =========================================================
 
-    // Consume inputs y añade outputs nuevos al estado confirmado.
-    // Resincroniza el estado pendiente para que parta del estado real.
+    // Aplica el bloque confirmado sobre utxoSet y pendingUtxoSet, y registra los IDs.
     public void updateState(Block block) {
         for (Transaction tx : block.getBody().getTransactions()) {
             applyTransactionToUtxoSet(tx, utxoSet);
@@ -189,15 +187,15 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 8 — Validación para la Mempool
     // =========================================================
 
-    // Igual que validateTransaction() pero usando el estado pendiente.
-    // Detecta double-spend entre TX aún no minadas.
+    // Igual que validateTransaction() pero sobre el estado pendiente.
+    // Detecta double-spend entre TX aún no minadas y reserva los UTXOs consumidos.
     public boolean validateForMempool(Transaction tx) {
         if (!checkFormat(tx))          return false;
         if (!checkIntegrity(tx))       return false;
         if (!validateAuthenticity(tx)) return false;
         if (!checkAntiReplay(tx))      return false;
 
-        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+        if (isCoinbase(tx)) return true;
 
         List<TransactionInput> inputs = tx.getInputs();
         if (inputs == null || inputs.isEmpty()) {
@@ -206,10 +204,17 @@ public class TransactionValidator extends AbstractVerticle {
         }
 
         long totalInput = 0L;
+        Set<String> usedInputs = new HashSet<>();
 
         // FASE 1 — VALIDAR
         for (TransactionInput input : inputs) {
             String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+            if (!usedInputs.add(key)) {
+                warn(tx, "[Mempool] input duplicado");
+                return false;
+            }
+
             TransactionOutput utxo = pendingUtxoSet.get(key);
             if (utxo == null) {
                 warn(tx, "[Mempool] UTXO no disponible: " + key);
@@ -249,12 +254,10 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 9 — Verificación UTXO e anti-replay
     // =========================================================
 
-    // Verifica:
-    // - Que cada input referencia un UTXO existente
-    // - Que el sender es dueño del UTXO
-    // - Que outputs <= inputs
+    // Verifica que cada input referencia un UTXO existente, que el sender es su dueño,
+    // que no hay inputs duplicados y que outputs <= inputs.
     public boolean checkUtxoInputs(Transaction tx) {
-        if ("COINBASE_SYSTEM".equals(tx.getSender())) return true;
+        if (isCoinbase(tx)) return true;
 
         List<TransactionInput> inputs = tx.getInputs();
         if (inputs == null || inputs.isEmpty()) {
@@ -263,8 +266,16 @@ public class TransactionValidator extends AbstractVerticle {
         }
 
         long totalInput = 0L;
+        Set<String> usedInputs = new HashSet<>();
+
         for (TransactionInput input : inputs) {
             String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
+
+            if (!usedInputs.add(key)) {
+                warn(tx, "input duplicado");
+                return false;
+            }
+
             TransactionOutput utxo = utxoSet.get(key);
             if (utxo == null) {
                 warn(tx, "UTXO no disponible: " + key);
@@ -285,7 +296,7 @@ public class TransactionValidator extends AbstractVerticle {
         return true;
     }
 
-    // Rechaza una TX cuyo ID ya fue procesado anteriormente
+    // Rechaza una TX cuyo ID ya fue procesado anteriormente.
     public boolean checkAntiReplay(Transaction tx) {
         if (seenTransactionIds.contains(tx.getTransactionId())) {
             warn(tx, "ID duplicado (anti-replay)");
@@ -299,8 +310,20 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 10 — Validación completa para bloques
     // =========================================================
 
-    // Validación conjunta de todos los métodos anteriores.
+    // Pipeline completo de validación. Las coinbase tienen sus propias reglas.
     public boolean validateTransaction(Transaction tx) {
+        if (isCoinbase(tx)) {
+            if (tx.getInputs() != null && !tx.getInputs().isEmpty()) {
+                warn(tx, "coinbase con inputs");
+                return false;
+            }
+            if (tx.getOutputs() == null || tx.getOutputs().isEmpty()) {
+                warn(tx, "coinbase sin outputs");
+                return false;
+            }
+            return true;
+        }
+
         if (!checkFormat(tx))          return false;
         if (!checkIntegrity(tx))       return false;
         if (!validateAuthenticity(tx)) return false;
@@ -315,7 +338,12 @@ public class TransactionValidator extends AbstractVerticle {
     // HELPERS PRIVADOS
     // =========================================================
 
-    // Aplica todas las TX de un bloque confirmado al estado local
+    // Devuelve true si la TX es una coinbase (creación de moneda nueva).
+    private boolean isCoinbase(Transaction tx) {
+        return "COINBASE_SYSTEM".equals(tx.getSender());
+    }
+
+    // Aplica todas las TX de un bloque confirmado al utxoSet y registra sus IDs.
     private void applyBlockToState(Block block) {
         for (Transaction tx : block.getBody().getTransactions()) {
             applyTransactionToUtxoSet(tx, utxoSet);
@@ -323,12 +351,11 @@ public class TransactionValidator extends AbstractVerticle {
         }
     }
 
-    // Consume inputs y crea outputs nuevos dentro de un UTXO Set
+    // Consume los inputs eliminándolos del mapa y añade los outputs nuevos.
     private void applyTransactionToUtxoSet(Transaction tx, Map<String, TransactionOutput> utxos) {
         if (tx.getInputs() != null) {
             for (TransactionInput input : tx.getInputs()) {
-                String key = utxoKey(input.getPreviousTransactionId(), input.getOutputIndex());
-                utxos.remove(key);
+                utxos.remove(utxoKey(input.getPreviousTransactionId(), input.getOutputIndex()));
             }
         }
         List<TransactionOutput> outputs = tx.getOutputs();
@@ -337,12 +364,12 @@ public class TransactionValidator extends AbstractVerticle {
         }
     }
 
-    // Clave única de un output UTXO -> txId:outputIndex
+    // Clave única de un UTXO: txId:outputIndex
     private String utxoKey(String txId, int outputIndex) {
         return txId + ":" + outputIndex;
     }
 
-    // Función auxiliar para informar de fallos
+    // Log auxiliar de rechazo.
     private void warn(Transaction tx, String motivo) {
         String shortId = tx.getTransactionId() != null
                 ? tx.getTransactionId().substring(0, Math.min(12, tx.getTransactionId().length()))
