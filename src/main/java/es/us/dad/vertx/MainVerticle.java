@@ -18,6 +18,8 @@ public class MainVerticle extends AbstractVerticle {
     public void start(Promise<Void> startPromise) {
         DeploymentOptions options = new DeploymentOptions().setConfig(config());
         BlockChain sharedBlockchain = new BlockChain(); //Para que el validador y el minero compartan el blockchain
+        TransactionValidator sharedTransactionValidator = new TransactionValidator(sharedBlockchain);
+        Future<String> transactionValidatorDeploy = vertx.deployVerticle(sharedTransactionValidator);
         Future<String> p2pDeploy = vertx.deployVerticle(new P2PConnectionManager(), options);
         Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(sharedBlockchain), options);
         Future<String> walletDeploy = vertx.deployVerticle(new WalletVerticle(), options);
@@ -25,7 +27,7 @@ public class MainVerticle extends AbstractVerticle {
         Future<String> transactionValidatorDeploy = vertx.deployVerticle(new TransactionValidator(sharedBlockchain));
         Future<String> memPoolDeploy=vertx.deployVerticle(new MempoolManager(sharedBlockchain));
 
-        Future.all(validatorDeploy,p2pDeploy, minerDeploy, walletDeploy, transactionValidatorDeploy).onComplete(res -> {
+        Future.all(validatorDeploy, p2pDeploy, minerDeploy, walletDeploy, transactionValidatorDeploy).onComplete(res -> {
             if (res.succeeded()) {
                 System.out.println("\n🚀 =======================================");
                 System.out.println("   NODO BITUSCOIN INICIADO CORRECTAMENTE");
