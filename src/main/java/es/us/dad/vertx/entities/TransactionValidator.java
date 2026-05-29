@@ -106,14 +106,10 @@ public class TransactionValidator extends AbstractVerticle {
     // PUNTO 4 — Reglas de formato
     // =========================================================
 
-    // Reglas mínimas: amount > 0 y sender != receiver
+    // Regla: amount > 0 (No implementamos sender != receiver porque implementamos UTXO)
     public boolean checkFormat(Transaction tx) {
         if (tx.getAmount() <= 0) {
             warn(tx, "amount debe ser > 0");
-            return false;
-        }
-        if (tx.getSender().equals(tx.getReceiver())) {
-            warn(tx, "sender y receiver son iguales");
             return false;
         }
         return true;
