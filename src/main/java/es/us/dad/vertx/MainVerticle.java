@@ -24,6 +24,8 @@ public class MainVerticle extends AbstractVerticle {
         Future<String> minerDeploy = vertx.deployVerticle(new MinerVerticle(sharedBlockchain), options);
         Future<String> walletDeploy = vertx.deployVerticle(new WalletVerticle(), options);
         Future<String> validatorDeploy = vertx.deployVerticle(new BlockValidator(sharedBlockchain));
+        Future<String> transactionValidatorDeploy = vertx.deployVerticle(new TransactionValidator(sharedBlockchain));
+        Future<String> memPoolDeploy=vertx.deployVerticle(new MempoolManager(sharedBlockchain));
 
         Future.all(validatorDeploy, p2pDeploy, minerDeploy, walletDeploy, transactionValidatorDeploy).onComplete(res -> {
             if (res.succeeded()) {

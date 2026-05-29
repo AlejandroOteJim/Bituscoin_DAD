@@ -1,5 +1,6 @@
 package es.us.dad.vertx.pool;
 
+import es.us.dad.vertx.entities.BlockChain;
 import es.us.dad.vertx.entities.Transaction;
 import es.us.dad.vertx.entities.TransactionValidator;
 import es.us.dad.vertx.network.BusAddresses;
@@ -14,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 // ✅ Requisito 1: Creo nueva clase propia para pool
-public class MempoolManager {
+public class MempoolManager extends AbstractVerticle{
 
     // ✅ Requisito 2: Uso de priorityQuene en vez de arrayList y defino su comparacion de tiempo timeStamp
     private PriorityQueue<Transaction> transactionPool = new PriorityQueue<>((tx1,tx2) ->{
@@ -31,12 +32,19 @@ public class MempoolManager {
     private static final Long TIME_SEND_STATUS = 5000L;
     private Vertx vertx;
 
-    private TransactionValidator validator = new TransactionValidator();
+    private final BlockChain blockChain;
+    private TransactionValidator validator;
 
     private int tx_size;
 
-    public MempoolManager(Vertx vertx) {
-        this.vertx = vertx;
+
+    public MempoolManager(BlockChain blockChain) {
+        this.blockChain = blockChain;
+    }
+    @Override
+    public void start(){
+
+        validator  = new TransactionValidator();
         //Inicializa el cantidad
         memPoolSize();
         //Requesito 8: En lugar de usar esta funcion, debe poner un tempolizador para que esta funcion se usa cada una cierta tiempo
