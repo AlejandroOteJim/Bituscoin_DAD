@@ -3,6 +3,7 @@ package es.us.dad.vertx.network;
 import es.us.dad.vertx.entities.Block;
 import es.us.dad.vertx.entities.BlockChain;
 import es.us.dad.vertx.entities.Transaction;
+import es.us.dad.vertx.entities.TransactionValidator;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonObject;
 
@@ -18,9 +19,12 @@ public class BlockValidator extends AbstractVerticle {
     // PASO 6: Lógica de "Orphan Blocks" (Memoria temporal)
     private final Map<String, Block> orphanBlocks;
 
+    private final TransactionValidator validator;
+
     // Constructor donde inyectamos la Blockchain local
-    public BlockValidator(BlockChain blockChain) {
+    public BlockValidator(BlockChain blockChain, TransactionValidator validator) {
         this.blockChain = blockChain;
+        this.validator = validator;
         this.orphanBlocks = new HashMap<>();
     }
 
@@ -161,7 +165,7 @@ public class BlockValidator extends AbstractVerticle {
             }
 
             // 8: Delegar la verificación de firmas al Notario (SecurityUtils a través de Transaction)
-            if (!tx.verifySignature()) {
+            if (!validator.validateAuthenticity(tx)) {
                 throw new RuntimeException("Firma ECDSA inválida en la transacción: " + tx.getTransactionId());
             }
         }

@@ -31,12 +31,13 @@ public class MempoolManager {
     private static final Long TIME_SEND_STATUS = 5000L;
     private Vertx vertx;
 
-    private TransactionValidator validator = new TransactionValidator();
+    private TransactionValidator validator;
 
     private int tx_size;
 
-    public MempoolManager(Vertx vertx) {
+    public MempoolManager(Vertx vertx, TransactionValidator validator) {
         this.vertx = vertx;
+        this.validator = validator;
         //Inicializa el cantidad
         memPoolSize();
         //Requesito 8: En lugar de usar esta funcion, debe poner un tempolizador para que esta funcion se usa cada una cierta tiempo

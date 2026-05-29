@@ -1,10 +1,6 @@
 package es.us.dad.vertx.miner;
 
-import es.us.dad.vertx.entities.Block;
-import es.us.dad.vertx.entities.BlockChain;
-import es.us.dad.vertx.entities.Body;
-import es.us.dad.vertx.entities.CoinbaseTransaction;
-import es.us.dad.vertx.entities.Transaction;
+import es.us.dad.vertx.entities.*;
 import es.us.dad.vertx.network.BusAddresses;
 
 import io.vertx.core.AbstractVerticle;
@@ -31,9 +27,13 @@ public class MinerVerticle extends AbstractVerticle {
     // CAMBIO 1: Instancia del worker de Proof-of-Work.
     private PoWMiner poWMiner = new PoWMiner();
 
-    public MinerVerticle(BlockChain blockChain) {
+    private final TransactionValidator validator;
+
+    public MinerVerticle(BlockChain blockChain, TransactionValidator validator) {
         this.blockchain = blockChain;
+        this.validator = validator;
     }
+
     @Override
     public void start() {
         // Inicializamos la blockchain (esto crea el bloque Génesis internamente)
@@ -75,7 +75,7 @@ public class MinerVerticle extends AbstractVerticle {
         Transaction tx = new Transaction(txJson);
 
         // 🛡️ BARRERA CRIPTOGRÁFICA
-        if (!tx.verifySignature() || !tx.getTransactionId().equals(tx.calculateHash())) {
+        if (!validator.validateAuthenticity(tx) || !tx.getTransactionId().equals(tx.calculateHash())) {
             System.err.println("🚨 HACKER DETECTADO: Firma inválida en la TX " + tx.getTransactionId());
             return; // Descartamos la transacción inmediatamente
         }
