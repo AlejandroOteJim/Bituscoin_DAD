@@ -1,6 +1,9 @@
 package es.us.dad.vertx.pool;
 
 import es.us.dad.vertx.entities.Transaction;
+import es.us.dad.vertx.entities.TransactionValidator;
+import es.us.dad.vertx.network.BusAddresses;
+import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
@@ -28,9 +31,11 @@ public class MempoolManager {
     private static final Long TIME_SEND_STATUS = 5000L;
     private Vertx vertx;
 
+    private TransactionValidator validator = new TransactionValidator();
+
     private int tx_size;
 
-    public MempoolManager(Vertx vertx){
+    public MempoolManager(Vertx vertx) {
         this.vertx = vertx;
         //Inicializa el cantidad
         memPoolSize();
@@ -42,20 +47,26 @@ public class MempoolManager {
         txListen();
     }
 
+
+
     //Cuando recibo nuevo tx desde INCOMING_TRANSACTION, validar
     private void txListen(){
-        vertx.eventBus().<JsonObject>consumer("INCOMING_TRANSACTION", message -> {
-            JsonObject txJson = message.body();
-            validaTx(txJson);
+        System.out.println("Estoy-------------------------------------------------------");
+        vertx.eventBus().consumer(BusAddresses.INCOMING_TRANSACTION, msg -> {
+            validaTx((JsonObject) msg.body());
         });
-        System.out.println("Ya estoy puesta en eventBus para recibir Txs");
+
+        vertx.eventBus().consumer(BusAddresses.NEW_TRANSACTION, msg -> {
+            validaTx((JsonObject) msg.body());
+        });
+        System.out.println("Ya estoy puesta en eventBus para recibir Txs-------------------------------------------------------");
     }
 
     // Añadir
-    private void addTransactionToPool(JsonObject txJson) {
+    private void addTransactionToPool(Transaction tx) {
 
         //Convertir en tipo Transaction
-        Transaction tx = new Transaction(txJson);
+
         tx.setTransactionId(tx.calculateHash());
 
         /* creo ya no es necesario porque ya ha verificado modulo 5
@@ -76,7 +87,7 @@ public class MempoolManager {
         //actualiza tx_size
         memPoolSize();
 
-        System.out.println("📥 TX válida añadida a Mempool. Total: " + tx_size+ "/" + BLOCK_SIZE);
+        System.out.println("📥 TXs válida añadida a Mempool. Total: " + tx_size+ "/" + BLOCK_SIZE);
 
         //Requesito 6: Pool lleno
         if(tx_size>POOL_SIZE){
@@ -87,7 +98,7 @@ public class MempoolManager {
     }
 
     // ✅ Requesito 4: Sacar los trasactiones sin eliminar desde pool
-    private List<Transaction> pullTransactions(int limit){
+    public List<Transaction> pullTransactions(int limit){
         List<Transaction> transactions = new ArrayList<Transaction>();
         PriorityQueue<Transaction> tempPool = new PriorityQueue<>(transactionPool);
         for(int cont = 0; cont< limit; cont++){
@@ -99,7 +110,7 @@ public class MempoolManager {
     }
 
     // ✅ Requesito 5: Cuando recibe la comfirmacion de Modelo 4 y los txs minados, elimino desde pool
-    private void purgeComfirmed(List<Transaction> minedTxs){
+    public void purgeComfirmed(List<Transaction> minedTxs){
         for(Transaction tx: minedTxs) {
             if (transactionPool.contains(tx)) {
                 transactionPool.remove(tx);
@@ -124,13 +135,13 @@ public class MempoolManager {
 
     // ✅ Requesito 7: Validar
     private void validaTx(JsonObject txJson){
-        vertx.eventBus().<Boolean>request("TRANSACTION_VALIDATOR", txJson)
-                .onSuccess(reply -> {
-                    addTransactionToPool(txJson);
-                })
-                .onFailure(error -> {
-                    System.err.println("⚠️ Validator 响应失败: " + error.getMessage());
-                });
+        Transaction tx = new Transaction(txJson);
+        boolean isValid = validator.validateForMempool(tx);
+        if(isValid){
+            addTransactionToPool(tx);
+        }else{
+            System.out.println("Error validacion");
+        }
     }
 
     // ✅ Requisito 8: cada un periodo de tiempo, en este caso 30s, se revisa los txs si esta expirado
@@ -181,6 +192,10 @@ public class MempoolManager {
             System.out.println("Hay suficientes txs. Aviso a Mineros");
             vertx.eventBus().send("mempool.ready", tx_size);
         }
+    }
+
+    public int getSize(){
+        return tx_size;
     }
 
 }
