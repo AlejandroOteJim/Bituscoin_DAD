@@ -23,15 +23,15 @@ public class BlockChain {
 
     // APARTADO 2
     // Motor de Vert.x necesario para acceder al FileSystem de forma asíncrona.
-    // Se usa 'transient' para evitar que el serializador intente convertir el motor entero de Vert.x a JSON, lo cual causaría un error fatal.
+    // Se usa 'transient' para evitar que el serializador intente convertir el motor entero de Vert.x a JSON, lo cual causaría un error fatal
     private transient Vertx vertx;
 
     private static HashMap<String, Block> hashes = new HashMap<>();
 
     public BlockChain() { // nos llama al constructor el miner
         // APARTADO 2
-        // Ajustamos el constructor para tener en cuenta el Vertx, la API que nos da acceso al fileSystem
-        this.vertx = Vertx.vertx(); // mirar si aquí estás creando una instancia nueva o mirando la que ya tenemos
+        //ajustamos el constructor para tener en cuenta el Vertx, la API que nos da acceso al fileSystem
+        this.vertx = Vertx.vertx();
         this.chain = new ArrayList<>();
 
         loadChainFromDisk();
